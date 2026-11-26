@@ -9,7 +9,7 @@
 <style>
 /* Panel de incidencias de Beeping (portado del artifact "Incidencias Beeping · Aurialo").
    Datos compartidos en Supabase: beeping:inc:raw (lo que envía el marcador) y beeping:inc:data (datos + registro de cambios). */
-:root{--bg:#f6f5f8;--surface:#fff;--sunk:#efedf3;--line:#e7e4ec;--fg:#1d1b24;--muted:#6c6878;--accent:#7b4fd6;--accent-soft:#efe8fd;
+:root{--bg:#f4f6f9;--surface:#fff;--sunk:#eceff4;--line:#e3e7ee;--fg:#4b5563;--muted:#8a93a3;--accent:#1e3a6e;--accent-soft:#e6ecf6;
 --ok:#14915a;--ok-soft:#e3f6ec;--warn:#b7791f;--warn-soft:#fdf3e1;--bad:#c2414b;--bad-soft:#fde8ea;--idle:#77858d;--idle-soft:#e6eaec;--new:#6b3fb5;--new-soft:#ebe2f8}
 *{box-sizing:border-box}
 body{margin:0;background:transparent;color:var(--fg);font:14px/1.45 Inter,system-ui,sans-serif}
@@ -60,9 +60,9 @@ input[type=search],select{font:inherit;padding:7px 10px;border:1px solid var(--l
 input[type=search]{min-width:0;flex:1 1 200px}
 .tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
 table{border-collapse:collapse;width:100%;min-width:1060px}
-th{background:#faf9fc;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:9px 10px;font-weight:600;white-space:nowrap;cursor:pointer}
+th{background:#f6f8fb;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:9px 10px;font-weight:600;white-space:nowrap;cursor:pointer}
 td{padding:9px 10px;border-top:1px solid var(--line);vertical-align:top;font-size:13px}
-tr.row:hover td{background:#fbfaff}tr.row{cursor:pointer}
+tr.row:hover td{background:#f8fafd}tr.row{cursor:pointer}
 .muted{color:var(--muted)}
 .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap}
 .p-ok{background:var(--ok-soft);color:var(--ok)}.p-warn{background:var(--warn-soft);color:var(--warn)}.p-bad{background:var(--bad-soft);color:var(--bad)}.p-idle{background:var(--idle-soft);color:var(--idle)}.p-new{background:var(--new-soft);color:var(--new)}.p-acc{background:var(--accent-soft);color:var(--accent)}
@@ -127,7 +127,7 @@ textarea{width:100%;font-family:ui-monospace,monospace;font-size:11px;border:1px
 /* Marcador: se ejecuta en newapp.gobeeping.com. Sin comentarios de línea y con punto y coma: se pega como una sola línea. */
 function marcadorBeeping(SB, K, CRM) {
   const D = document, ov = D.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(20,15,35,.75);display:flex;align-items:center;justify-content:center;font:14px system-ui';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(15,33,72,.75);display:flex;align-items:center;justify-content:center;font:14px system-ui';
   const bx = D.createElement('div');
   bx.style.cssText = 'background:#fff;color:#111;padding:20px;border-radius:12px;width:min(560px,92vw)';
   ov.appendChild(bx); D.body.appendChild(ov);
@@ -169,12 +169,12 @@ function marcadorBeeping(SB, K, CRM) {
       if (sent) {
         h.textContent = '✅ ' + rows.length + ' incidencias enviadas al CRM.';
         const o = D.createElement('a'); o.href = CRM; o.target = '_blank'; o.textContent = 'Abrir el CRM';
-        o.style.cssText = 'display:inline-block;margin-top:14px;padding:10px 16px;background:#7b4fd6;color:#fff;border-radius:8px;font-weight:600;text-decoration:none';
+        o.style.cssText = 'display:inline-block;margin-top:14px;padding:10px 16px;background:#1e3a6e;color:#fff;border-radius:8px;font-weight:600;text-decoration:none';
         bx.append(h, D.createElement('br'), o, c);
       } else {
         h.textContent = rows.length + ' incidencias listas, pero no se pudieron enviar al CRM (' + err + '). Copia y pega en el CRM.';
         const ta = D.createElement('textarea'); ta.value = txt; ta.readOnly = true; ta.style.cssText = 'width:100%;height:120px;margin:12px 0;font:11px monospace;box-sizing:border-box';
-        const b = D.createElement('button'); b.textContent = 'Copiar datos'; b.style.cssText = 'padding:10px 16px;background:#7b4fd6;color:#fff;border:0;border-radius:8px;font-weight:600;cursor:pointer';
+        const b = D.createElement('button'); b.textContent = 'Copiar datos'; b.style.cssText = 'padding:10px 16px;background:#1e3a6e;color:#fff;border:0;border-radius:8px;font-weight:600;cursor:pointer';
         b.onclick = async () => { ta.select(); try { await navigator.clipboard.writeText(txt); } catch (e) { D.execCommand('copy'); } b.textContent = 'Copiado ✓'; };
         bx.append(h, ta, b, c);
       }
