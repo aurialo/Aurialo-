@@ -527,7 +527,8 @@ views.logistica = () => {
     const presets = [["cerrada", "Semana cerrada (hace 7–13 días)"], ["hoy", "Hoy"], ["ayer", "Ayer"], ["7", "Últimos 7 días"], ["14", "Últimos 14 días"], ["30", "Últimos 30 días"], ["mes", "Este mes"], ["mespasado", "Mes pasado"], ["todo", "Todo"], ["custom", "Personalizado"]];
     const big = (l, v, cls, s) => `<div class="kpi"><div class="l">${l}</div><div class="v"><span class="pill ${cls}" style="font-size:22px;padding:4px 12px">${v}</span></div><div class="s">${s}</div></div>`;
     body = `<div class="toolbar"><select id="fb-preset">${presets.map(([v, l]) => `<option value="${v}" ${v === f.preset ? "selected" : ""}>${l}</option>`).join("")}</select>
-      ${f.preset === "custom" ? `<input type="date" id="fb-desde" value="${esc(f.desde)}"> → <input type="date" id="fb-hasta" value="${esc(f.hasta)}">` : ""}
+      <label class="hint">Desde</label><input type="date" id="fb-desde" value="${esc(d1 < "2001" ? (beeping.rows.map(r => r.fecha).sort()[0] || "") : d1)}">
+      <label class="hint">Hasta</label><input type="date" id="fb-hasta" value="${esc(d2 > "2998" ? today() : d2)}">
       <span class="hint">${esc(beeping.fuente || "Sin datos")}${beeping.fecha ? " · " + new Date(beeping.fecha).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}</span>
       <span class="grow"></span><button class="btn sec" id="fb-reload">🔄 Actualizar</button></div>
     ${beeping.error ? `<div class="card hint">⚠️ ${esc(beeping.error)}</div>` : ""}
@@ -600,9 +601,10 @@ views.logistica.bind = () => {
   on("#new-tar", () => openForm("Nueva tarea", F_TAR, { responsable: me(), estado: "Pendiente" }, r => save("tareas", r)));
   const s = $("#fi-est"); if (s) s.onchange = e => { ui.filters.inc.est = e.target.value; render(); };
   const fb = ui.filters.bee;
-  const p = $("#fb-preset"); if (p) p.onchange = e => { fb.preset = e.target.value; render(); };
-  const d1 = $("#fb-desde"); if (d1) d1.onchange = e => { fb.desde = e.target.value; render(); };
-  const d2 = $("#fb-hasta"); if (d2) d2.onchange = e => { fb.hasta = e.target.value; render(); };
+  const p = $("#fb-preset"); if (p) p.onchange = e => { fb.preset = e.target.value; if (fb.preset === "custom" && !fb.desde) { fb.desde = $("#fb-desde").value; fb.hasta = $("#fb-hasta").value; } render(); };
+  const fix = () => { fb.desde = $("#fb-desde").value; fb.hasta = $("#fb-hasta").value; if (fb.desde && fb.hasta && fb.desde > fb.hasta) [fb.desde, fb.hasta] = [fb.hasta, fb.desde]; fb.preset = "custom"; render(); };
+  const d1 = $("#fb-desde"); if (d1) d1.onchange = fix;
+  const d2 = $("#fb-hasta"); if (d2) d2.onchange = fix;
   on("#fb-reload", async () => { await loadBeeping(); render(); toast("Datos de Beeping actualizados"); });
 };
 
