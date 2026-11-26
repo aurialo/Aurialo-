@@ -86,6 +86,67 @@ function setSync() {
   s.textContent = online ? "Sincronizado con Supabase" : "Sin conexión · modo local";
 }
 
+/* ---------- Beeping (Google Sheet "Registro-Base") ---------- */
+const beeping = { rows: [], fuente: "", fecha: null, error: "" };
+const bnum = s => { s = String(s ?? "").trim(); if (!s || s === "-") return 0; const neg = /^\(.*\)/.test(s) || s.startsWith("-"); s = s.replace(/[()€%\s-]/g, "").replace(/\./g, "").replace(",", "."); const v = n(s); return neg ? -v : v; };
+function parseBeeping(text) {
+  const rows = parseCSV(text);
+  const hi = rows.findIndex(r => r.some(c => norm(c) === "fecha") && r.some(c => norm(c) === "generados"));
+  if (hi < 0) return [];
+  const h = rows[hi].map(norm), col = name => h.findIndex(x => x.startsWith(norm(name)));
+  const I = { fecha: col("fecha"), inversion: col("inversion publicitaria"), ventas: col("importe total"), generados: col("generados"), confirmados: col("confirmados"),
+    entregados: col("entregados"), devueltos: col("devueltos"), ingresos: col("importe entregado"), costeProducto: col("coste total de producto"),
+    envio: col("coste por envio"), picking: col("coste por picking"), cod: col("coste por cod"), financiero: col("coste financiero"), costes: col("total costes") };
+  const out = [];
+  rows.slice(hi + 1).forEach(r => {
+    const m = String(r[I.fecha] || "").trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if (!m) return;
+    const o = { fecha: `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` };
+    Object.entries(I).forEach(([k, i]) => { if (k !== "fecha") o[k] = i >= 0 ? Math.abs(bnum(r[i])) : 0; });
+    out.push(o);
+  });
+  return out;
+}
+async function loadBeeping() {
+  beeping.error = "";
+  if (C.beepingCsvUrl) {
+    try {
+      const r = await fetch(C.beepingCsvUrl + (C.beepingCsvUrl.includes("?") ? "&" : "?") + "t=" + Date.now());
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const rows = parseBeeping(await r.text());
+      if (!rows.length) throw new Error("no encuentro la tabla de Registro-Base");
+      Object.assign(beeping, { rows, fuente: "Google Sheet en directo", fecha: new Date().toISOString() });
+      const snap = db.sistema.find(x => x.id === "beeping");
+      if (online && (!snap || Date.now() - new Date(snap.fecha).getTime() > 30 * 60e3)) save("sistema", { id: "beeping", fecha: beeping.fecha, fuente: "Google Sheet", filas: rows });
+      return;
+    } catch (e) { beeping.error = "No se pudo leer el Google Sheet (" + e.message + "). Se muestra la última copia guardada."; }
+  }
+  const snap = db.sistema.find(x => x.id === "beeping");
+  if (snap) Object.assign(beeping, { rows: snap.filas || [], fuente: "Copia guardada (" + (snap.fuente || "Sheet") + ")", fecha: snap.fecha });
+}
+function aggBeeping(rows) {
+  const t = rows.reduce((a, r) => { ["inversion", "ventas", "generados", "confirmados", "entregados", "devueltos", "ingresos", "costes"].forEach(k => a[k] += n(r[k])); return a; },
+    { inversion: 0, ventas: 0, generados: 0, confirmados: 0, entregados: 0, devueltos: 0, ingresos: 0, costes: 0 });
+  t.beneficio = t.ingresos - t.costes - t.inversion;
+  t.pConf = t.generados ? t.confirmados / t.generados : null;
+  t.pEnt = t.confirmados ? t.entregados / t.confirmados : null;
+  t.pBen = t.ingresos ? t.beneficio / t.ingresos : null;
+  t.roas = t.inversion ? t.ingresos / t.inversion : null;
+  t.cpa = t.entregados ? t.inversion / t.entregados : null;
+  return t;
+}
+const semaf = (v, ok, warn) => v == null ? "" : v >= ok ? "ok" : v >= warn ? "warn" : "bad";
+function rangoBeeping(preset, desde, hasta) {
+  const d = new Date(), iso = x => x.toISOString().slice(0, 10), menos = k => { const x = new Date(); x.setDate(x.getDate() - k); return iso(x); };
+  if (preset === "hoy") return [iso(d), iso(d)];
+  if (preset === "cerrada") return [menos(13), menos(7)];
+  if (preset === "ayer") return [menos(1), menos(1)];
+  if (preset === "mes") return [iso(new Date(d.getFullYear(), d.getMonth(), 1, 12)), iso(d)];
+  if (preset === "mespasado") return [iso(new Date(d.getFullYear(), d.getMonth() - 1, 1, 12)), iso(new Date(d.getFullYear(), d.getMonth(), 0, 12))];
+  if (preset === "todo") return ["2000-01-01", "2999-12-31"];
+  if (preset === "custom") return [desde || "2000-01-01", hasta || "2999-12-31"];
+  return [menos(n(preset) - 1), iso(d)];
+}
+
 /* ---------- componentes ---------- */
 function armDelete(btn, fn) {
   if (btn.classList.contains("armed")) { fn(); return; }
@@ -180,7 +241,17 @@ views.panel = () => {
   const cOk = conf7.reduce((a, c) => a + n(c.confirmados), 0), cTot = conf7.reduce((a, c) => a + n(c.confirmados) + n(c.cancelados) + n(c.noContesta), 0);
   const top = cr.filter(x => x.k.compras > 0 && x.k.gasto >= C.reglas.gastoMinimo).sort((a, b) => n(b.k.roas) - n(a.k.roas)).slice(0, 5);
   const malos = cr.filter(x => x.k.veredicto === "No relanzar").sort((a, b) => b.k.gasto - a.k.gasto).slice(0, 5);
+  const dIso = k => new Date(Date.now() - k * 864e5).toISOString().slice(0, 10);
+  const b7 = aggBeeping(beeping.rows.filter(r => r.fecha >= dIso(6)));
+  const bc = aggBeeping(beeping.rows.filter(r => r.fecha >= dIso(13) && r.fecha <= dIso(7)));
+  const bcTxt = `${fdate(dIso(13))}–${fdate(dIso(7))}`;
   return `<h1>Panel</h1><div class="sub">Hola ${esc(me())}. Así va Aurialo hoy.</div>
+  ${beeping.rows.length ? `<h2 style="margin-top:0">📦 Tienda (Beeping)</h2><div class="grid" style="margin-bottom:14px">
+    ${kpi("% Confirmación · 7 días", `<span class="pill ${semaf(b7.pConf, .75, .6)}" style="font-size:20px">${pct(b7.pConf)}</span>`, `${b7.confirmados} de ${b7.generados} pedidos`)}
+    ${kpi("% Entrega · semana cerrada", `<span class="pill ${semaf(bc.pEnt, .85, .7)}" style="font-size:20px">${pct(bc.pEnt)}</span>`, `${bc.entregados} de ${bc.confirmados} · ${bcTxt}`)}
+    ${kpi("Beneficio · semana cerrada", `<span style="color:var(--${bc.beneficio >= 0 ? "ok" : "bad"})">${eur(bc.beneficio)}</span>`, `Ingresos ${eur(bc.ingresos)} · ${bcTxt}`)}
+    ${kpi("% Beneficio · semana cerrada", pct(bc.pBen), "Sobre lo entregado")}
+  </div><h2>📈 Meta Ads y equipo</h2>` : ""}
   <div class="grid">
     ${kpi("Gasto en creativos", eur(gasto), `${cr.length} creativos registrados`)}
     ${kpi("ROAS global (corregido)", x2(gasto ? ing / gasto : null), `${comp} compras · CPA ${eur(comp ? gasto / comp : null)}`)}
@@ -446,9 +517,46 @@ const F_TAR = [
   { k: "estado", label: "Estado", type: "select", opts: ["Pendiente", "En curso", "Hecha"] }, { k: "fecha", label: "Fecha límite", type: "date" },
   { k: "notas", label: "Notas", type: "textarea", full: 1 }];
 views.logistica = () => {
-  const [tab, tabsHtml] = tabs("logistica", [["conf", "Confirmaciones WhatsApp"], ["inc", "Incidencias"], ["tar", "Tareas"]]);
+  const [tab, tabsHtml] = tabs("logistica", [["res", "Resultados (Beeping)"], ["conf", "Confirmaciones WhatsApp"], ["inc", "Incidencias"], ["tar", "Tareas"]]);
   let body = "";
-  if (tab === "conf") {
+  if (tab === "res") {
+    const f = ui.filters.bee || (ui.filters.bee = { preset: "cerrada", desde: "", hasta: "" });
+    const [d1, d2] = rangoBeeping(f.preset, f.desde, f.hasta);
+    const rows = beeping.rows.filter(r => r.fecha >= d1 && r.fecha <= d2).sort((a, b) => b.fecha.localeCompare(a.fecha));
+    const t = aggBeeping(rows), hace7 = new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10);
+    const presets = [["cerrada", "Semana cerrada (hace 7–13 días)"], ["hoy", "Hoy"], ["ayer", "Ayer"], ["7", "Últimos 7 días"], ["14", "Últimos 14 días"], ["30", "Últimos 30 días"], ["mes", "Este mes"], ["mespasado", "Mes pasado"], ["todo", "Todo"], ["custom", "Personalizado"]];
+    const big = (l, v, cls, s) => `<div class="kpi"><div class="l">${l}</div><div class="v"><span class="pill ${cls}" style="font-size:22px;padding:4px 12px">${v}</span></div><div class="s">${s}</div></div>`;
+    body = `<div class="toolbar"><select id="fb-preset">${presets.map(([v, l]) => `<option value="${v}" ${v === f.preset ? "selected" : ""}>${l}</option>`).join("")}</select>
+      ${f.preset === "custom" ? `<input type="date" id="fb-desde" value="${esc(f.desde)}"> → <input type="date" id="fb-hasta" value="${esc(f.hasta)}">` : ""}
+      <span class="hint">${esc(beeping.fuente || "Sin datos")}${beeping.fecha ? " · " + new Date(beeping.fecha).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}</span>
+      <span class="grow"></span><button class="btn sec" id="fb-reload">🔄 Actualizar</button></div>
+    ${beeping.error ? `<div class="card hint">⚠️ ${esc(beeping.error)}</div>` : ""}
+    <div class="grid">
+      ${big("% Confirmación", pct(t.pConf), semaf(t.pConf, .75, .6), `${t.confirmados} confirmados de ${t.generados} generados`)}
+      ${big("% Entrega", pct(t.pEnt), semaf(t.pEnt, .85, .7), `${t.entregados} entregados · ${t.devueltos} devueltos`)}
+      ${big("Beneficio (resultado)", eur(t.beneficio), t.beneficio > 0 ? "ok" : "bad", `Ingresos entregados ${eur(t.ingresos)}`)}
+      ${big("% Beneficio", pct(t.pBen), semaf(t.pBen, .2, .05), "Sobre el importe entregado")}
+    </div>
+    <div class="grid" style="margin-top:12px">
+      ${kpi("Ventas generadas", eur(t.ventas), `${t.generados} pedidos`)}
+      ${kpi("Gasto en publicidad", eur(t.inversion), `ROAS real ${x2(t.roas)} · CPA entregado ${eur(t.cpa)}`)}
+      ${kpi("Producto + logística", eur(t.costes), "Producto, envío, picking, COD y financiero")}
+    </div>
+    <p class="hint">El % de entrega de los últimos días sube a medida que llegan los pedidos (marcados «en curso»). Si un día no tiene gasto de publicidad en el Sheet, su beneficio aparece sin descontarlo.</p>` +
+    table("bee", [
+      { k: "fecha", label: "Fecha", h: r => fdate(r.fecha) + (r.fecha >= hace7 ? ` <span class="hint">en curso</span>` : "") },
+      { k: "generados", label: "Generados", num: 1 }, { k: "confirmados", label: "Confirm.", num: 1 },
+      { k: "pConf", label: "% Conf.", num: 1, v: r => r.generados ? r.confirmados / r.generados : null, h: r => { const v = r.generados ? r.confirmados / r.generados : null; return `<span class="pill ${semaf(v, .75, .6)}">${pct(v)}</span>`; } },
+      { k: "entregados", label: "Entreg.", num: 1 },
+      { k: "pEnt", label: "% Entrega", num: 1, v: r => r.confirmados ? r.entregados / r.confirmados : null, h: r => { const v = r.confirmados ? r.entregados / r.confirmados : null; return `<span class="pill ${semaf(v, .85, .7)}">${pct(v)}</span>`; } },
+      { k: "devueltos", label: "Devuel.", num: 1 },
+      { k: "ventas", label: "Ventas", num: 1, h: r => eur(r.ventas) }, { k: "ingresos", label: "Entregado", num: 1, h: r => eur(r.ingresos) },
+      { k: "inversion", label: "Publicidad", num: 1, h: r => r.inversion ? eur(r.inversion) : `<span class="hint">—</span>` },
+      { k: "costes", label: "Costes", num: 1, h: r => eur(r.costes) },
+      { k: "ben", label: "Beneficio", num: 1, v: r => r.ingresos - r.costes - r.inversion, h: r => { const b = r.ingresos - r.costes - r.inversion; return `<b style="color:var(--${b >= 0 ? "ok" : "bad"})">${eur(b)}</b>`; } },
+      { k: "pBen", label: "% Benef.", num: 1, v: r => r.ingresos ? (r.ingresos - r.costes - r.inversion) / r.ingresos : null, h: r => pct(r.ingresos ? (r.ingresos - r.costes - r.inversion) / r.ingresos : null) }
+    ], rows, beeping.rows.length ? "No hay días en este rango" : "Aún no hay datos de Beeping. Publica la pestaña Registro-Base del Sheet (ver README).");
+  } else if (tab === "conf") {
     const hace7 = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
     const stats = C.equipo.map(p => { const l = db.confirmaciones.filter(c => c.persona === p && c.fecha >= hace7);
       const ok = l.reduce((a, c) => a + n(c.confirmados), 0), tot = l.reduce((a, c) => a + n(c.confirmados) + n(c.cancelados) + n(c.noContesta), 0);
@@ -491,6 +599,11 @@ views.logistica.bind = () => {
   on("#new-inc", () => openForm("Nueva incidencia", F_INC, { responsable: me(), estado: "Abierta" }, r => save("incidencias", r)));
   on("#new-tar", () => openForm("Nueva tarea", F_TAR, { responsable: me(), estado: "Pendiente" }, r => save("tareas", r)));
   const s = $("#fi-est"); if (s) s.onchange = e => { ui.filters.inc.est = e.target.value; render(); };
+  const fb = ui.filters.bee;
+  const p = $("#fb-preset"); if (p) p.onchange = e => { fb.preset = e.target.value; render(); };
+  const d1 = $("#fb-desde"); if (d1) d1.onchange = e => { fb.desde = e.target.value; render(); };
+  const d2 = $("#fb-hasta"); if (d2) d2.onchange = e => { fb.hasta = e.target.value; render(); };
+  on("#fb-reload", async () => { await loadBeeping(); render(); toast("Datos de Beeping actualizados"); });
 };
 
 /* ----- Competencia ----- */
@@ -616,11 +729,12 @@ $("#yo").onchange = e => { localStorage.setItem("crm_yo", e.target.value); rende
 (async () => {
   if (views[location.hash.slice(1)]) ui.view = location.hash.slice(1);
   await load();
+  await loadBeeping();
   if (online && !db.competidores.length && !db.sistema.some(s => s.id === "seed")) {
     for (const c of C.competidoresIniciales) await save("competidores", { ...c });
     await save("sistema", { id: "seed", fecha: today() });
   }
   render();
-  setInterval(async () => { if (!$("#modal").classList.contains("hidden") || ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) return; await load(); render(); }, C.refrescoSegundos * 1000);
+  setInterval(async () => { if (!$("#modal").classList.contains("hidden") || ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) return; await load(); if (!C.beepingCsvUrl || Date.now() - new Date(beeping.fecha || 0).getTime() > 5 * 60e3) await loadBeeping(); render(); }, C.refrescoSegundos * 1000);
 })();
 })();

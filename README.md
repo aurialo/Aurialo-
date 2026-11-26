@@ -9,7 +9,7 @@ Centro de operaciones interno de Aurialo. Es una web sin instalación (HTML + Ja
 | **Panel** | Resumen del día: gasto y ROAS de creativos, ganadores, lo que no hay que relanzar, producción, incidencias, tareas y tasa de confirmación. Muestra avisos según el día (reporte lunes, miércoles y viernes; lanzamiento martes y jueves; no escalar de viernes a domingo). |
 | **Meta Ads** | Métricas de cada creativo (gasto, hook, CTR, CPC, compras, CPA, ROAS) con estado automático: *Ganador, Prometedor, Vigilar, No relanzar, En test*. Importa el CSV del Administrador de anuncios y corrige el ROAS con las compras reales de Shopify. Incluye vistas agrupadas por ángulo y por formato. |
 | **Director creativo** | Pipeline Idea → Guion → Producción → Listo → Lanzado. Genera el nombre estándar `angulo_identificacion_producto`. Al pulsar «Lanzar», el creativo pasa a Meta Ads. Reúne las reglas creativas y los ángulos validados con un botón para iterarlos. |
-| **Equipo logístico** | Registro diario de confirmaciones COD por WhatsApp (tasa por persona), incidencias de envío con enlace directo a WhatsApp, y tablero de tareas. |
+| **Equipo logístico** | **Resultados (Beeping):** % confirmación, % entrega, beneficio y % beneficio por día y por periodo, leídos del Google Sheet «Control Contable de Tienda Aurialo» (pestaña Registro-Base, sincronizada con Beeping cada 30 min). Además: registro diario de confirmaciones COD por WhatsApp (tasa por persona), incidencias de envío con enlace directo a WhatsApp, y tablero de tareas. |
 | **Competencia** | Competidores por producto con enlace a la Ads Library, anuncios vistos (ángulo, formato y días activo) y un análisis de los ángulos que usa la competencia y que Aurialo aún no ha probado. |
 
 ## Estructura
@@ -45,3 +45,15 @@ Todo se edita en `config.js`: miembros del equipo, productos, formatos, herramie
 `scripts/meta_sync.py` vuelca al CRM las métricas acumuladas de cada anuncio de la cuenta **Aurialo 1** (gasto, impresiones, clics, compras y valor de compras, más campaña, conjunto y estado en Meta). Una tarea programada de Claude lo ejecuta los lunes, miércoles y viernes por la mañana: consulta Meta Ads, actualiza el CRM y deja un resumen de qué creativos escalar, cuáles vigilar y cuáles no relanzar.
 
 Cada anuncio se guarda como `crm:creativos:meta_<id>`. Lo que el equipo escriba a mano en el CRM (notas, compras reales de Shopify, ticket medio, estado forzado o ángulo/formato corregidos) no se sobrescribe.
+
+## Resultados de Beeping (Google Sheet)
+
+El CRM lee la pestaña **Registro-Base** del Sheet «Control Contable de Tienda Aurialo», que solo contiene totales diarios (sin datos de clientes). Para que se actualice solo:
+
+1. En el Sheet: **Archivo → Compartir → Publicar en la web**.
+2. En «Enlace», elige la pestaña **Registro-Base** (no «Todo el documento») y el formato **Valores separados por comas (.csv)**. Pulsa **Publicar**.
+3. Copia el enlace y ponlo en `beepingCsvUrl` dentro de `config.js`.
+
+Fórmulas (iguales que el Informe Contable): % Confirmación = confirmados / generados · % Entrega = entregados / confirmados · Beneficio = importe entregado − costes de producto y logística − publicidad · % Beneficio = beneficio / importe entregado.
+
+Mientras no haya enlace, el CRM muestra la última copia guardada en Supabase.

@@ -9,6 +9,12 @@ window.AURIALO_CONFIG = {
   prefijo: "crm:",
   refrescoSegundos: 30,
 
+  // Resultados diarios de Beeping: pestaña "Registro-Base" del Google Sheet
+  // "Control Contable de Tienda Aurialo", publicada en la web como CSV
+  // (Archivo → Compartir → Publicar en la web → Registro-Base → CSV).
+  // Si está vacío, el CRM usa la última copia guardada en Supabase.
+  beepingCsvUrl: "",
+
   equipo: ["Cristian", "Florencia", "Mayra"],
 
   productos: [
