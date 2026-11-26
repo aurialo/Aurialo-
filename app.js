@@ -154,14 +154,15 @@ function m(r) {
 }
 function veredicto(k) {
   const R = C.reglas;
-  if ((k.dias != null && k.dias < R.diasMinimos) || k.gasto < R.gastoMinimo) return "En test";
+  if (k.dias != null && k.dias < R.diasMinimos) return "En test";
+  if (k.gasto < R.gastoMinimo && k.compras === 0) return (k.dias != null && k.dias >= 7) ? "Sin datos" : "En test";
   if (k.compras === 0 && k.gasto >= R.gastoSinVentas) return "No relanzar";
   if (k.compras >= R.comprasGanador && k.roas >= R.roasGanador) return "Ganador";
   if (k.roas >= R.roasPrometedor) return "Prometedor";
   if (k.roas != null && k.roas < R.roasDescartar) return "No relanzar";
   return "Vigilar";
 }
-const VCLS = { "Ganador": "ok", "Prometedor": "info", "Vigilar": "warn", "No relanzar": "bad", "En test": "brand" };
+const VCLS = { "Ganador": "ok", "Prometedor": "info", "Vigilar": "warn", "No relanzar": "bad", "En test": "brand", "Sin datos": "" };
 const vpill = v => `<span class="pill ${VCLS[v] || ""}">${esc(v)}</span>`;
 
 /* ---------- vistas ---------- */
@@ -183,7 +184,7 @@ views.panel = () => {
   <div class="grid">
     ${kpi("Gasto en creativos", eur(gasto), `${cr.length} creativos registrados`)}
     ${kpi("ROAS global (corregido)", x2(gasto ? ing / gasto : null), `${comp} compras · CPA ${eur(comp ? gasto / comp : null)}`)}
-    ${kpi("Ganadores", count("Ganador"), `${count("Prometedor")} prometedores · ${count("En test")} en test`)}
+    ${kpi("Ganadores", count("Ganador"), `${count("Prometedor")} prometedores · ${count("En test")} en test · ${count("Sin datos")} sin datos`)}
     ${kpi("No relanzar", count("No relanzar"), "Creativos descartados por datos")}
     ${kpi("En producción", pipe.reduce((a, p) => a + p[1], 0), pipe.map(p => `${p[0]} ${p[1]}`).join(" · "))}
     ${kpi("Incidencias abiertas", incAb.length, `${db.incidencias.filter(i => i.estado === "Abierta").length} sin gestionar`)}
@@ -237,7 +238,7 @@ views.meta = () => {
     .filter(x => (!f.act || x.r.estadoMeta === "ACTIVE") && (!f.prod || x.r.producto === f.prod) && (!f.ver || x.k.veredicto === f.ver) && (!f.q || (x.r.nombre || "").toLowerCase().includes(f.q.toLowerCase())));
   const toolbar = `<div class="toolbar">
     <select id="f-prod">${prodOpts("Todos los productos").map(([v, l]) => `<option value="${v}" ${v === f.prod ? "selected" : ""}>${l}</option>`).join("")}</select>
-    <select id="f-ver">${["", "Ganador", "Prometedor", "Vigilar", "No relanzar", "En test"].map(v => `<option value="${v}" ${v === f.ver ? "selected" : ""}>${v || "Todos los estados"}</option>`).join("")}</select>
+    <select id="f-ver">${["", "Ganador", "Prometedor", "Vigilar", "No relanzar", "En test", "Sin datos"].map(v => `<option value="${v}" ${v === f.ver ? "selected" : ""}>${v || "Todos los estados"}</option>`).join("")}</select>
     <input id="f-q" placeholder="Buscar creativo…" value="${esc(f.q)}"><label class="hint"><input type="checkbox" id="f-act" ${f.act ? "checked" : ""}> Solo activos en Meta</label><span class="grow"></span>
     <button class="btn sec" id="imp-meta">⬆️ Importar CSV de Meta</button><button class="btn" id="new-cr">+ Creativo</button></div>`;
   let body = "";
