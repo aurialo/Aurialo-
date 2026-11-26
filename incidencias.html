@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Incidencias Beeping · Aurialo CRM</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="config.js"></script>
+<style>
+/* Panel de incidencias de Beeping (portado del artifact "Incidencias Beeping · Aurialo").
+   Datos compartidos en Supabase: beeping:inc:raw (lo que envía el marcador) y beeping:inc:data (datos + registro de cambios). */
+:root{--bg:#f6f5f8;--surface:#fff;--sunk:#efedf3;--line:#e7e4ec;--fg:#1d1b24;--muted:#6c6878;--accent:#7b4fd6;--accent-soft:#efe8fd;
+--ok:#14915a;--ok-soft:#e3f6ec;--warn:#b7791f;--warn-soft:#fdf3e1;--bad:#c2414b;--bad-soft:#fde8ea;--idle:#77858d;--idle-soft:#e6eaec;--new:#6b3fb5;--new-soft:#ebe2f8}
+*{box-sizing:border-box}
+body{margin:0;background:transparent;color:var(--fg);font:14px/1.45 Inter,system-ui,sans-serif}
+.num{font-variant-numeric:tabular-nums}.mono{font-family:ui-monospace,monospace;font-size:12.5px}
+h2,h3{margin:0}h2{font-size:15px}
+.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+button,.btn{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:7px 12px;font-weight:500}
+button:hover{border-color:var(--accent)}
+.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+a{color:var(--accent)}
+.topbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between}
+.sync{color:var(--muted);font-size:12.5px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px}.dot.stale{background:var(--warn)}
+section{margin-top:20px}
+.sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+.alerts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.alert{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);text-align:left;width:100%}
+.alert b{font-size:26px;line-height:1}
+.alert.bad{background:var(--bad-soft);border-color:transparent}.alert.bad b{color:var(--bad)}
+.alert.warn{background:var(--warn-soft);border-color:transparent}.alert.warn b{color:var(--warn)}
+.alert.new{background:var(--new-soft);border-color:transparent}.alert.new b{color:var(--new)}
+.alert.okk{background:var(--ok-soft);border-color:transparent}.alert.okk b{color:var(--ok)}
+.alert span{font-size:13px}.alert small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.funnel{display:grid;grid-template-columns:1.1fr 1fr 2.4fr;gap:10px}
+.kcol{display:grid;gap:10px;align-content:start;min-width:0}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.kpi .v{font-size:30px;font-weight:700;line-height:1.05;margin-top:4px}
+.kpi .s{color:var(--muted);font-size:12.5px;margin-top:2px}
+.kpi.stripe{border-left:4px solid var(--c,var(--line))}
+.sub{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.sub .kpi .v{font-size:26px}
+.meter{height:8px;border-radius:4px;background:var(--sunk);overflow:hidden;display:flex;margin-top:10px}.meter i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+.money{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}.money .kpi .v{font-size:22px}
+.grid2{display:grid;grid-template-columns:1.35fr 1fr;gap:10px}.grid2b{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.hbar{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.6fr) 48px;gap:6px 10px;align-items:center;font-size:12.5px}
+.hbar .lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hbar .track{display:flex;height:16px;border-radius:3px;overflow:hidden;background:var(--sunk)}.hbar .track i{height:100%;display:block}
+.hbar .rt{text-align:right;color:var(--muted)}
+.chartbox{overflow-x:auto}svg text{fill:var(--muted);font-size:11px}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;background:var(--sunk);padding:3px;border-radius:9px}
+.tabs button{border:0;background:transparent;padding:6px 10px;font-size:13px}
+.tabs button[aria-pressed="true"]{background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.12);font-weight:600}
+.tabs .c{color:var(--muted);margin-left:4px;font-size:12px}
+input[type=search],select{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
+input[type=search]{min-width:0;flex:1 1 200px}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:1060px}
+th{background:#faf9fc;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:9px 10px;font-weight:600;white-space:nowrap;cursor:pointer}
+td{padding:9px 10px;border-top:1px solid var(--line);vertical-align:top;font-size:13px}
+tr.row:hover td{background:#fbfaff}tr.row{cursor:pointer}
+.muted{color:var(--muted)}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.p-ok{background:var(--ok-soft);color:var(--ok)}.p-warn{background:var(--warn-soft);color:var(--warn)}.p-bad{background:var(--bad-soft);color:var(--bad)}.p-idle{background:var(--idle-soft);color:var(--idle)}.p-new{background:var(--new-soft);color:var(--new)}.p-acc{background:var(--accent-soft);color:var(--accent)}
+.sev{width:4px;padding:0!important}.sev.bad{background:var(--bad)}.sev.warn{background:var(--warn)}.sev.ok{background:var(--ok)}.sev.idle{background:var(--idle)}
+tr.det td{background:var(--bg);padding:12px 16px 14px 24px}
+.hist{display:grid;gap:6px}.hist div{display:grid;grid-template-columns:130px 1fr;gap:10px;font-size:12.5px}
+.empty{padding:30px;text-align:center;color:var(--muted)}
+.changes{display:grid;gap:4px;max-height:260px;overflow:auto;font-size:13px}
+.changes div{display:grid;grid-template-columns:110px 70px 1fr;gap:10px;padding:5px 0;border-bottom:1px solid var(--line)}
+.sync-panel{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.steps{margin:0;padding-left:20px;display:grid;gap:6px}
+textarea{width:100%;font-family:ui-monospace,monospace;font-size:11px;border:1px solid var(--line);border-radius:8px;background:var(--sunk);color:var(--fg);padding:8px;resize:vertical}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:14px;display:grid;gap:8px}.drop.on{border-color:var(--accent);background:var(--accent-soft)}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--fg);color:#fff;padding:10px 16px;border-radius:10px;font-weight:500;z-index:20}
+@media (max-width:980px){.funnel,.grid2,.grid2b,.sync-panel{grid-template-columns:1fr}.money{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:520px){.sub{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div><b style="font-size:16px">Incidencias de Beeping</b> <span class="sync" id="syncInfo">Cargando…</span></div>
+  <div style="display:flex;gap:8px"><button type="button" id="btnReload">🔄 Recargar</button><button id="btnSync" class="primary" type="button">Actualizar desde Beeping</button></div>
+</div>
+
+<section id="syncSec" hidden>
+  <div class="panel">
+    <div class="sec-head"><h2>Actualizar desde Beeping</h2><button type="button" id="btnCloseSync">Cerrar</button></div>
+    <div class="sync-panel">
+      <div>
+        <p class="eyebrow">Una sola vez: crea el marcador</p>
+        <ol class="steps">
+          <li>Pulsa <b>Copiar código del marcador</b>.</li>
+          <li>En Chrome: clic derecho en la barra de marcadores → <b>Añadir página</b>. Nombre: <i>Incidencias → CRM</i>. En URL pega el código.</li>
+          <li>Si ya tenías el marcador antiguo (<i>Sync incidencias</i>), sustitúyelo por este.</li>
+        </ol>
+        <p class="eyebrow" style="margin-top:14px">Cada vez que quieras actualizar</p>
+        <ol class="steps">
+          <li>Abre <span class="mono">newapp.gobeeping.com</span> con tu sesión iniciada.</li>
+          <li>Pulsa el marcador <i>Incidencias → CRM</i> (tarda unos 30 s). Las incidencias se envían solas al CRM y todo el equipo las ve al momento.</li>
+          <li>Si el envío directo fallara, el marcador te deja <b>Copiar datos</b>: pégalos aquí con Ctrl+V / Cmd+V.</li>
+        </ol>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button type="button" class="primary" id="btnCopyBm">Copiar código del marcador</button></div>
+        <textarea id="bmCode" rows="3" readonly style="margin-top:8px"></textarea>
+      </div>
+      <div class="drop" id="drop">
+        <p class="eyebrow">Pegar datos (solo si el envío directo falla)</p>
+        <textarea id="pasteBox" rows="6" placeholder="Pega aquí lo copiado desde Beeping"></textarea>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button type="button" class="primary" id="btnImport">Importar</button>
+          <label class="btn" for="fileIn">Cargar archivo .json</label><input id="fileIn" type="file" accept=".json,application/json" hidden>
+        </div>
+        <p class="muted" style="margin:0;font-size:12px">El marcador lee tu propia sesión de Beeping desde tu navegador. Del cliente solo guarda el nombre y la inicial del apellido.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="app"></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/* Marcador: se ejecuta en newapp.gobeeping.com. Sin comentarios de línea y con punto y coma: se pega como una sola línea. */
+function marcadorBeeping(SB, K, CRM) {
+  const D = document, ov = D.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(20,15,35,.75);display:flex;align-items:center;justify-content:center;font:14px system-ui';
+  const bx = D.createElement('div');
+  bx.style.cssText = 'background:#fff;color:#111;padding:20px;border-radius:12px;width:min(560px,92vw)';
+  ov.appendChild(bx); D.body.appendChild(ov);
+  const say = m => { bx.textContent = m; };
+  (async () => {
+    try {
+      if (!/gobeeping\.com/.test(location.host)) { throw new Error('Abre newapp.gobeeping.com con tu sesión iniciada y vuelve a pulsar el marcador'); }
+      const a = JSON.parse(localStorage.getItem('auth-storage'));
+      const t = (a.state || a).token;
+      const H = { headers: { Authorization: 'Bearer ' + t, Accept: 'application/json' } };
+      const g = u => fetch('https://api.gobeeping.com/api/v1/' + u, H).then(r => { if (!r.ok) { throw new Error('HTTP ' + r.status + ' en ' + u); } return r.json(); });
+      let L = [], p = 1, lp = 1;
+      do { say('Leyendo incidencias, página ' + p + '...'); const j = await g('incidents?per_page=100&page=' + p); L = L.concat(j.data); lp = j.meta.lastPage; p++; } while (p <= lp);
+      const det = {}, ord = {};
+      const ids = [...new Set(L.map(x => x.order_id))];
+      let n = 0; const tot = L.length + ids.length;
+      const pool = async (arr, fn) => { for (let i = 0; i < arr.length; i += 8) { await Promise.all(arr.slice(i, i + 8).map(x => fn(x).catch(() => {}))); n += Math.min(8, arr.length - i); say('Leyendo gestiones y tracking: ' + n + ' / ' + tot); } };
+      await pool(L, async x => { det[x.id] = await g('incidents/' + x.id); });
+      await pool(ids, async id => { ord[id] = await g('orders/' + id); });
+      const nm = s => { if (!s) { return ''; } const q = s.trim().split(/\s+/); return q[0] + (q[1] ? ' ' + q[1][0] + '.' : ''); };
+      const rows = L.map(x => { const d = det[x.id] || {}, o = ord[x.order_id] || {}, s = o.shipment || {}, sm = s.status_mapped || {};
+        return { id: x.id, ref: x.order.ref, cli: nm(x.order.shipping_name), trk: x.order.tracking_number, url: x.order.tracking_url, cou: x.courier && x.courier.name,
+          ext: x.courier_incident_kind && x.courier_incident_kind.external_label, tipo: x.incident_type && x.incident_type.label, st: x.status, rep: x.report_date, res: x.resolution_date,
+          os: x.order.status && x.order.status.description_code, ship: sm.name || null, lu: s.last_shipment_update || null, tot: o.total, oc: o.order_created_at,
+          h: (d.historial || []).map(a => ({ n: a.action_snapshot_name, s: a.execution_status, d: a.created_at, o: a.payload_sent ? (a.payload_sent.observations || a.payload_sent.comentario || '') : '' })) }; });
+      const payload = { src: 'beeping-incidencias', v: 1, at: new Date().toISOString(), rows: rows };
+      const txt = JSON.stringify(payload);
+      say('Enviando ' + rows.length + ' incidencias al CRM...');
+      let sent = false, err = '';
+      try {
+        const r = await fetch(SB, { method: 'POST', headers: { apikey: K, Authorization: 'Bearer ' + K, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify([{ clave: 'beeping:inc:raw', valor: payload, actualizado: payload.at }]) });
+        sent = r.ok; if (!r.ok) { err = 'HTTP ' + r.status; }
+      } catch (e) { err = e.message; }
+      bx.innerHTML = '';
+      const h = D.createElement('b');
+      const c = D.createElement('button');
+      c.textContent = 'Cerrar'; c.style.cssText = 'padding:10px 16px;margin-left:8px;background:#eee;color:#111;border:0;border-radius:8px;cursor:pointer'; c.onclick = () => ov.remove();
+      if (sent) {
+        h.textContent = '✅ ' + rows.length + ' incidencias enviadas al CRM.';
+        const o = D.createElement('a'); o.href = CRM; o.target = '_blank'; o.textContent = 'Abrir el CRM';
+        o.style.cssText = 'display:inline-block;margin-top:14px;padding:10px 16px;background:#7b4fd6;color:#fff;border-radius:8px;font-weight:600;text-decoration:none';
+        bx.append(h, D.createElement('br'), o, c);
+      } else {
+        h.textContent = rows.length + ' incidencias listas, pero no se pudieron enviar al CRM (' + err + '). Copia y pega en el CRM.';
+        const ta = D.createElement('textarea'); ta.value = txt; ta.readOnly = true; ta.style.cssText = 'width:100%;height:120px;margin:12px 0;font:11px monospace;box-sizing:border-box';
+        const b = D.createElement('button'); b.textContent = 'Copiar datos'; b.style.cssText = 'padding:10px 16px;background:#7b4fd6;color:#fff;border:0;border-radius:8px;font-weight:600;cursor:pointer';
+        b.onclick = async () => { ta.select(); try { await navigator.clipboard.writeText(txt); } catch (e) { D.execCommand('copy'); } b.textContent = 'Copiado ✓'; };
+        bx.append(h, ta, b, c);
+      }
+    } catch (e) { say('Error: ' + e.message + ' (clic para cerrar)'); ov.onclick = () => ov.remove(); }
+  })();
+}
+
+(function(){
+const C = window.AURIALO_CONFIG;
+const SB = C.supabaseUrl + "/rest/v1/" + C.tabla, K = C.supabaseKey;
+const HD = { apikey: K, Authorization: "Bearer " + K, "Content-Type": "application/json" };
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const eur = n => (+n || 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+const pct = (a, b) => b ? Math.round(a * 100 / b) + '%' : '—';
+const fmtD = s => { if (!s) return '—'; const d = new Date(String(s).replace(' ', 'T')); return isNaN(d) ? s : d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }); };
+const fmtDT = s => { if (!s) return '—'; const d = new Date(String(s).replace(' ', 'T')); return isNaN(d) ? s : d.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); };
+const daysSince = s => s ? Math.max(0, (Date.now() - new Date(String(s).replace(' ', 'T'))) / 864e5) : 0;
+const LS = { get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+
+let DATA = null, CHANGES = [];
+let state = { mby: LS.get('bk_mby', 'oc'), tab: LS.get('bk_tab', 'accion'), q: '', cou: '', tipo: '', sort: 'rep', dir: -1, open: {} };
+
+/* ---- Supabase ---- */
+async function sbGet() {
+  const r = await fetch(SB + "?select=clave,valor&clave=in.(beeping:inc:raw,beeping:inc:data)", { headers: HD });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const out = {}; (await r.json()).forEach(x => { let v = x.valor; if (typeof v === "string") { try { v = JSON.parse(v); } catch (e) {} } out[x.clave] = v; });
+  return out;
+}
+async function sbSave() {
+  const now = new Date().toISOString();
+  await fetch(SB, { method: "POST", headers: { ...HD, Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify([{ clave: "beeping:inc:data", valor: { data: DATA, changes: CHANGES.slice(0, 300) }, actualizado: now }]) });
+}
+async function load(silent) {
+  try {
+    const o = await sbGet();
+    const d = o["beeping:inc:data"], raw = o["beeping:inc:raw"];
+    if (d && d.data) { const changed = !DATA || DATA.at !== d.data.at; DATA = d.data; CHANGES = d.changes || []; if (changed || !silent) render(); }
+    if (raw && raw.rows && (!DATA || raw.at > DATA.at)) { await importText(JSON.stringify(raw), true); }
+    else if (!DATA) render();
+  } catch (e) { if (!silent) { toast("No se pudo conectar con Supabase: " + e.message); if (!DATA) render(); } }
+}
+
+const LOST = ['Devuelto al Remitente', 'Devuelto', 'Destruido', 'Devolución', 'En devolución'];
+const RETRY = /concertar|recogida|cambio/i, GIVEUP = /devoluci|destruir/i;
+function classify(r) {
+  const okActs = r.h.filter(a => a.s === 'ok'), errActs = r.h.filter(a => a.s !== 'ok');
+  const gest = okActs.length > 0, last = okActs[okActs.length - 1];
+  const decision = !last ? null : (GIVEUP.test(last.n) ? 'abandono' : RETRY.test(last.n) ? 'reintento' : 'otra');
+  const ship = r.ship || '';
+  let fin = 'curso';
+  if (/entregad/i.test(ship)) fin = 'entregado';
+  else if (LOST.some(x => ship.indexOf(x) === 0) || /devuel|destru/i.test(ship) || r.os === 'Devuelto') fin = 'perdido';
+  let bucket;
+  if (!gest) bucket = r.st === 'pending' ? 'sin' : 'cerrada_sin';
+  else bucket = fin === 'entregado' ? 'g_entregada' : fin === 'perdido' ? 'g_noresuelta' : 'g_curso';
+  return { gest, decision, last, fin, bucket, accion: r.st === 'pending' && !gest && fin === 'curso', zombie: r.st === 'pending' && fin !== 'curso', errs: errActs.length, age: daysSince(r.rep) };
+}
+const BUCKET = {
+  sin: { l: 'Sin gestionar', p: 'p-bad', sev: 'bad' }, cerrada_sin: { l: 'Cerrada sin gestión', p: 'p-idle', sev: 'idle' },
+  g_entregada: { l: 'Gestionada · entregada', p: 'p-ok', sev: 'ok' }, g_noresuelta: { l: 'Gestionada · no resuelta', p: 'p-bad', sev: 'bad' },
+  g_curso: { l: 'Gestionada · en curso', p: 'p-warn', sev: 'warn' }
+};
+const shipPill = s => { if (!s) return '<span class="pill p-idle">Sin tracking</span>'; const c = /entregad/i.test(s) ? 'p-ok' : /devuel|destru/i.test(s) ? 'p-bad' : /reparto|tránsito|transito|delegaci|almac/i.test(s) ? 'p-acc' : 'p-warn'; return `<span class="pill ${c}">${esc(s)}</span>`; };
+
+async function importText(txt, auto) {
+  let j; try { j = JSON.parse(String(txt).trim()); } catch (e) { toast('No es un JSON válido. Copia de nuevo con el botón «Copiar datos» de Beeping.'); return; }
+  if (!j || j.src !== 'beeping-incidencias' || !Array.isArray(j.rows)) { toast('Esos datos no vienen del marcador de Beeping.'); return; }
+  if (DATA && DATA.at === j.at) return;
+  const prev = DATA ? Object.fromEntries(DATA.rows.map(r => [r.id, { b: classify(r).bucket, ship: r.ship }])) : null;
+  const now = j.at || new Date().toISOString(); let nNew = 0, nCh = 0;
+  if (prev) j.rows.forEach(r => { const c = classify(r), p = prev[r.id];
+    if (!p) { nNew++; CHANGES.unshift({ at: now, ref: r.ref, id: r.id, t: 'Nueva incidencia: ' + (r.tipo || r.ext || '') + ' (' + (r.cou || '') + ')', k: 'new' }); }
+    else if (p.b !== c.bucket || p.ship !== r.ship) { nCh++; CHANGES.unshift({ at: now, ref: r.ref, id: r.id, t: (p.b !== c.bucket ? BUCKET[p.b].l + ' → ' + BUCKET[c.bucket].l : '') + (p.ship !== r.ship ? (p.b !== c.bucket ? ' · ' : '') + 'Tracking: ' + (p.ship || '—') + ' → ' + (r.ship || '—') : ''), k: c.fin === 'entregado' ? 'ok' : c.fin === 'perdido' ? 'bad' : 'acc' }); }
+  });
+  CHANGES = CHANGES.slice(0, 300);
+  j.newIds = prev ? j.rows.filter(r => !prev[r.id]).map(r => r.id) : [];
+  j.prevAt = DATA ? DATA.at : null;
+  DATA = j;
+  $('#syncSec').hidden = true; $('#pasteBox').value = '';
+  try { await sbSave(); } catch (e) { toast('⚠️ No se pudo guardar en Supabase'); }
+  toast(prev ? `Actualizado: ${j.rows.length} incidencias · ${nNew} nuevas · ${nCh} con cambios` : `Cargadas ${j.rows.length} incidencias`);
+  render();
+}
+function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 4200); }
+
+function render() {
+  const app = $('#app');
+  if (!DATA) {
+    $('#syncInfo').textContent = 'Sin datos todavía';
+    app.innerHTML = `<section><div class="panel"><h2 style="font-size:18px">Carga las incidencias de Beeping</h2><p class="muted" style="max-width:62ch">Aquí verás cada incidencia con su estado de gestión, el tracking real de GLS y Correos Express, el dinero recuperado y el que está en juego. Pulsa <b>Actualizar desde Beeping</b> y crea el marcador: a partir de ahí, un clic en Beeping y las incidencias aparecen aquí para todo el equipo.</p><button class="primary" type="button" id="btnStart">Empezar</button></div></section>`;
+    $('#btnStart').onclick = () => { $('#syncSec').hidden = false; };
+    return;
+  }
+  const rows = DATA.rows.map(r => Object.assign({}, r, { c: classify(r) }));
+  const newSet = new Set(DATA.newIds || []);
+  const stale = daysSince(DATA.at) > 0.5;
+  $('#syncInfo').innerHTML = `<span class="dot ${stale ? 'stale' : ''}"></span>Actualizado ${esc(fmtDT(DATA.at))}${stale ? ' · conviene sincronizar' : ''}`;
+  const cnt = f => rows.filter(f).length, sum = f => rows.filter(f).reduce((a, r) => a + (+r.tot || 0), 0);
+  const T = rows.length, G = cnt(r => r.c.gest), N = T - G;
+  const sin = cnt(r => r.c.bucket === 'sin'), cerrSin = cnt(r => r.c.bucket === 'cerrada_sin');
+  const gE = cnt(r => r.c.bucket === 'g_entregada'), gNR = cnt(r => r.c.bucket === 'g_noresuelta'), gC = cnt(r => r.c.bucket === 'g_curso');
+  const accion = rows.filter(r => r.c.accion), zombies = rows.filter(r => r.c.zombie);
+  const retried = rows.filter(r => r.c.decision === 'reintento'), retriedClosed = retried.filter(r => r.c.fin !== 'curso'), retriedOk = retried.filter(r => r.c.fin === 'entregado');
+  const errs = cnt(r => r.c.errs > 0 && r.c.fin === 'curso');
+  const deliveredAll = cnt(r => r.c.fin === 'entregado');
+  let html = '';
+  html += `<section><div class="sec-head"><h2>Qué requiere atención</h2><span class="muted" style="font-size:12.5px">Pulsa una tarjeta para filtrar la tabla</span></div><div class="alerts">
+    <button type="button" class="alert ${accion.length ? 'bad' : 'okk'}" data-go="accion"><b>${accion.length}</b><span>Pendientes sin gestionar<small>${accion.length ? 'Abiertas y sin ninguna acción enviada · la más antigua lleva ' + Math.floor(Math.max(...accion.map(r => r.c.age))) + ' días' : 'Todo gestionado'}</small></span></button>
+    <button type="button" class="alert ${newSet.size ? 'new' : ''}" data-go="nuevas"><b>${newSet.size}</b><span>Nuevas desde la última sincronización<small>${DATA.prevAt ? 'Respecto a ' + esc(fmtDT(DATA.prevAt)) : 'Aparecerán a partir de la próxima actualización'}</small></span></button>
+    <button type="button" class="alert ${zombies.length ? 'warn' : ''}" data-go="zombie"><b>${zombies.length}</b><span>Abiertas con tracking ya cerrado<small>Siguen pendientes en Beeping pero el envío ya figura como entregado, devuelto o destruido</small></span></button>
+    <button type="button" class="alert ${errs ? 'warn' : ''}" data-go="error"><b>${errs}</b><span>Con acciones fallidas<small>La mensajería rechazó alguna acción y el envío sigue en curso</small></span></button>
+  </div></section>`;
+  html += `<section><div class="sec-head"><h2>Embudo de gestión</h2><span class="muted" style="font-size:12.5px">${T} incidencias · ${cnt(r => r.cou === 'GLS')} GLS · ${cnt(r => r.cou !== 'GLS')} Correos Express</span></div>
+  <div class="funnel">
+    <div class="kcol">
+      <div class="kpi stripe" style="--c:var(--accent)"><div class="eyebrow">Total incidencias</div><div class="v num">${T}</div><div class="s">${cnt(r => r.st === 'pending')} abiertas en Beeping · ${cnt(r => r.st === 'resolved')} cerradas</div></div>
+      <div class="kpi stripe" style="--c:var(--bad)"><div class="eyebrow">No gestionadas</div><div class="v num">${N}</div><div class="s"><b style="color:var(--bad)">${sin}</b> abiertas esperando acción · ${cerrSin} cerradas sin acción</div></div>
+    </div>
+    <div class="kcol">
+      <div class="kpi stripe" style="--c:var(--accent)"><div class="eyebrow">Gestionadas</div><div class="v num">${G}</div><div class="s">${pct(G, T)} del total · ${retried.length} reintentos de entrega, ${cnt(r => r.c.decision === 'abandono')} devoluciones o destrucciones</div></div>
+      <div class="kpi stripe" style="--c:var(--ok)"><div class="eyebrow">Tasa de rescate</div><div class="v num">${pct(retriedOk.length, retriedClosed.length)}</div><div class="s">${retriedOk.length} entregados de ${retriedClosed.length} reintentos ya cerrados</div></div>
+    </div>
+    <div class="panel"><div class="eyebrow">Resultado de las gestionadas</div>
+      <div class="sub" style="margin-top:10px">
+        <div class="kpi stripe" style="--c:var(--ok)"><div class="eyebrow">Resueltas · entregadas</div><div class="v num">${gE}</div><div class="s">${pct(gE, G)} de gestionadas</div></div>
+        <div class="kpi stripe" style="--c:var(--bad)"><div class="eyebrow">No resueltas · devueltas</div><div class="v num">${gNR}</div><div class="s">${pct(gNR, G)} · devuelto o destruido</div></div>
+        <div class="kpi stripe" style="--c:var(--warn)"><div class="eyebrow">En curso</div><div class="v num">${gC}</div><div class="s">Gestionadas, aún en tránsito</div></div>
+      </div>
+      <div class="meter"><i style="width:${gE * 100 / Math.max(G, 1)}%;background:var(--ok)"></i><i style="width:${gC * 100 / Math.max(G, 1)}%;background:var(--warn)"></i><i style="width:${gNR * 100 / Math.max(G, 1)}%;background:var(--bad)"></i></div>
+      <div class="legend"><span><i style="background:var(--ok)"></i>Entregadas</span><span><i style="background:var(--warn)"></i>En curso</span><span><i style="background:var(--bad)"></i>Devueltas</span></div>
+    </div>
+  </div>
+  <div class="money">
+    <div class="kpi"><div class="eyebrow">Contrarreembolso cobrado</div><div class="v num" style="color:var(--ok)">${eur(sum(r => r.c.fin === 'entregado'))}</div><div class="s">${deliveredAll} pedidos entregados tras incidencia</div></div>
+    <div class="kpi"><div class="eyebrow">En juego</div><div class="v num" style="color:var(--warn)">${eur(sum(r => r.c.fin === 'curso'))}</div><div class="s">${cnt(r => r.c.fin === 'curso')} pedidos todavía en tránsito</div></div>
+    <div class="kpi"><div class="eyebrow">Perdido</div><div class="v num" style="color:var(--bad)">${eur(sum(r => r.c.fin === 'perdido'))}</div><div class="s">${cnt(r => r.c.fin === 'perdido')} devueltos o destruidos</div></div>
+    <div class="kpi"><div class="eyebrow">Tasa de entrega global</div><div class="v num">${pct(deliveredAll, cnt(r => r.c.fin !== 'curso'))}</div><div class="s">Sobre incidencias con tracking final</div></div>
+  </div></section>`;
+  html += monthly(rows);
+  html += `<section><div class="sec-head"><h2>Desglose</h2></div><div class="grid2">
+    <div class="panel"><h3 style="font-size:14px;margin-bottom:10px">Entrada semanal de incidencias por resultado</h3><div class="chartbox">${weekly(rows)}</div>
+      <div class="legend"><span><i style="background:var(--ok)"></i>Entregadas</span><span><i style="background:var(--warn)"></i>En curso</span><span><i style="background:var(--bad)"></i>Perdidas</span></div></div>
+    <div class="panel"><h3 style="font-size:14px;margin-bottom:12px">Por motivo de incidencia</h3>${hbars(group(rows, r => r.tipo || r.ext || 'Otro'))}</div>
+  </div><div class="grid2b">
+    <div class="panel"><h3 style="font-size:14px;margin-bottom:12px">Por mensajería</h3>${hbars(group(rows, r => r.cou || '—'))}</div>
+    <div class="panel"><h3 style="font-size:14px;margin-bottom:12px">Efectividad por acción enviada</h3>${hbars(group(rows.filter(r => r.c.last), r => r.c.last.n))}</div>
+  </div><div class="legend" style="margin-top:8px"><span><i style="background:var(--ok)"></i>Entregado</span><span><i style="background:var(--warn)"></i>En curso</span><span><i style="background:var(--bad)"></i>Devuelto / destruido</span><span>% a la derecha = entregados sobre cerrados</span></div></section>`;
+  const tabs = [['accion', 'Sin gestionar', accion.length], ['g_curso', 'Gestionadas en curso', gC], ['g_entregada', 'Entregadas', gE], ['g_noresuelta', 'No resueltas', gNR], ['nuevas', 'Nuevas', newSet.size], ['zombie', 'Abiertas con tracking cerrado', zombies.length], ['error', 'Acciones fallidas', errs], ['cerrada_sin', 'Cerradas sin gestión', cerrSin], ['todas', 'Todas', T]];
+  const tipos = [...new Set(rows.map(r => r.tipo || r.ext || 'Otro'))].sort();
+  html += `<section id="tablaSec"><div class="sec-head"><h2>Incidencias</h2><span class="muted" style="font-size:12.5px">Clic en una fila para ver el historial de gestiones</span></div>
+  <div class="tools"><div class="tabs" role="group">${tabs.map(t => `<button type="button" data-tab="${t[0]}" aria-pressed="${state.tab === t[0]}">${t[1]}<span class="c num">${t[2]}</span></button>`).join('')}</div></div>
+  <div class="tools"><input type="search" id="q" placeholder="Buscar pedido, cliente o tracking" value="${esc(state.q)}">
+    <select id="fCou"><option value="">Todas las mensajerías</option>${[...new Set(rows.map(r => r.cou))].map(c => `<option ${state.cou === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+    <select id="fTipo"><option value="">Todos los motivos</option>${tipos.map(c => `<option ${state.tipo === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+  <div class="tablebox" id="tbl"></div></section>`;
+  html += `<section><div class="sec-head"><h2>Registro de cambios</h2><span class="muted" style="font-size:12.5px">Nuevas incidencias y cambios de estado detectados en cada sincronización</span></div><div class="panel">${CHANGES.length ? `<div class="changes">${CHANGES.slice(0, 150).map(c => `<div><span class="muted num">${esc(fmtDT(c.at))}</span><b class="mono">${esc(c.ref)}</b><span><span class="pill ${c.k === 'new' ? 'p-new' : c.k === 'ok' ? 'p-ok' : c.k === 'bad' ? 'p-bad' : 'p-acc'}">${c.k === 'new' ? 'Nueva' : c.k === 'ok' ? 'Entregada' : c.k === 'bad' ? 'Perdida' : 'Cambio'}</span> ${esc(c.t)}</span></div>`).join('')}</div>` : '<p class="muted" style="margin:0">Aún no hay cambios. A partir de la próxima sincronización verás aquí qué incidencias entran nuevas y cuáles pasan a entregadas o devueltas.</p>'}</div></section>`;
+  app.innerHTML = html;
+  app.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { state.tab = b.dataset.go; LS.set('bk_tab', state.tab); render(); $('#tablaSec').scrollIntoView({ behavior: 'smooth' }); });
+  app.querySelectorAll('[data-mby]').forEach(b => b.onclick = () => { state.mby = b.dataset.mby; LS.set('bk_mby', state.mby); render(); });
+  app.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; LS.set('bk_tab', state.tab); render(); });
+  $('#q').oninput = e => { state.q = e.target.value; table(rows, newSet); };
+  $('#fCou').onchange = e => { state.cou = e.target.value; table(rows, newSet); };
+  $('#fTipo').onchange = e => { state.tipo = e.target.value; table(rows, newSet); };
+  table(rows, newSet);
+}
+function group(rows, key) { const m = {}; rows.forEach(r => { const k = key(r); m[k] = m[k] || { ok: 0, cur: 0, bad: 0 }; m[k][r.c.fin === 'entregado' ? 'ok' : r.c.fin === 'perdido' ? 'bad' : 'cur']++; }); return Object.entries(m).sort((a, b) => (b[1].ok + b[1].cur + b[1].bad) - (a[1].ok + a[1].cur + a[1].bad)); }
+function hbars(g) { if (!g.length) return '<p class="muted">Sin datos</p>'; const max = Math.max(1, ...g.map(([k, v]) => v.ok + v.cur + v.bad)); return `<div class="hbar">${g.map(([k, v]) => { const t = v.ok + v.cur + v.bad; return `<span class="lab" title="${esc(k)}">${esc(k)} <span class="muted num">${t}</span></span><span class="track" style="width:${Math.max(4, t * 100 / max)}%" title="${v.ok} entregados · ${v.cur} en curso · ${v.bad} perdidos"><i style="flex:${v.ok};background:var(--ok)"></i><i style="flex:${v.cur};background:var(--warn)"></i><i style="flex:${v.bad};background:var(--bad)"></i></span><span class="rt num">${pct(v.ok, v.ok + v.bad)}</span>`; }).join('')}</div>`; }
+function monthly(rows) {
+  const MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const mk = d => { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0'); };
+  const lab = k => { const [y, m] = k.split('-'); return MES[+m - 1] + ' ' + y; };
+  const now = new Date(), cur = mk(now);
+  const byOc = state.mby === 'oc', dt = r => byOc ? (r.oc || r.rep) : r.rep;
+  const blank = () => ({ t: 0, g: 0, n: 0, ok: 0, bad: 0, cur: 0, ret: 0, retOk: 0, retCl: 0, eOk: 0, eBad: 0, eCur: 0, sinAbiertas: 0 });
+  const M = {}; rows.forEach(r => { if (!dt(r)) return; const k = mk(String(dt(r)).replace(' ', 'T')); const o = M[k] = M[k] || blank();
+    o.t++; r.c.gest ? o.g++ : o.n++; if (r.c.bucket === 'sin') o.sinAbiertas++;
+    const f = r.c.fin === 'entregado' ? 'ok' : r.c.fin === 'perdido' ? 'bad' : 'cur'; o[f]++; o['e' + f[0].toUpperCase() + f.slice(1)] += (+r.tot || 0);
+    if (r.c.decision === 'reintento') { o.ret++; if (r.c.fin !== 'curso') o.retCl++; if (r.c.fin === 'entregado') o.retOk++; } });
+  const ks = Object.keys(M).sort(); if (!ks.length) return '';
+  const days = k => { const [y, m] = k.split('-').map(Number); return k === cur ? now.getDate() : new Date(y, m, 0).getDate(); };
+  const rate = o => o.ok + o.bad ? o.ok / (o.ok + o.bad) : null;
+  const c = M[cur] || blank();
+  const pk = ks.filter(k => k < cur).pop(), p = pk ? M[pk] : null;
+  const delta = (a, b, inv, fmt) => { if (b == null || a == null) return '<span class="muted">sin mes anterior</span>'; const d = a - b; if (Math.abs(d) < 1e-9) return '<span class="muted">igual que ' + esc(lab(pk).split(' ')[0]) + '</span>'; const good = inv ? d < 0 : d > 0; return `<span style="color:var(${good ? '--ok' : '--bad'});font-weight:600">${d > 0 ? '▲' : '▼'} ${fmt(Math.abs(d))}</span> <span class="muted">vs ${esc(lab(pk).split(' ')[0])}</span>`; };
+  const pp = v => Math.round(v * 100) + ' pts', n1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
+  const paceC = c.t / days(cur), paceP = p ? p.t / days(pk) : null;
+  const rc = rate(c), rp = p ? rate(p) : null, gc = c.t ? c.g / c.t : null, gp = p && p.t ? p.g / p.t : null;
+  return `<section><div class="sec-head"><h2>Mes a mes</h2><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="muted" style="font-size:12.5px">${esc(lab(cur))} va por el día ${now.getDate()} · agrupar por</span><div class="tabs" role="group"><button type="button" data-mby="rep" aria-pressed="${!byOc}">Fecha de la incidencia</button><button type="button" data-mby="oc" aria-pressed="${byOc}">Fecha del pedido</button></div></div></div>
+  <div class="money" style="margin-top:0">
+    <div class="kpi"><div class="eyebrow">Incidencias en ${esc(lab(cur).split(' ')[0])}</div><div class="v num">${c.t}</div><div class="s">${n1(paceC)} al día · ${delta(paceC, paceP, true, v => n1(v) + '/día')}</div></div>
+    <div class="kpi"><div class="eyebrow">% gestionadas</div><div class="v num">${gc == null ? '—' : Math.round(gc * 100) + '%'}</div><div class="s">${c.sinAbiertas} abiertas sin acción · ${delta(gc, gp, false, pp)}</div></div>
+    <div class="kpi"><div class="eyebrow">Tasa de entrega</div><div class="v num">${rc == null ? '—' : Math.round(rc * 100) + '%'}</div><div class="s">${c.ok} entregadas de ${c.ok + c.bad} cerradas · ${delta(rc, rp, false, pp)}</div></div>
+    <div class="kpi"><div class="eyebrow">Perdido en ${esc(lab(cur).split(' ')[0])}</div><div class="v num" style="color:var(--bad)">${eur(c.eBad)}</div><div class="s">${eur(c.eCur)} aún en juego · ${delta(c.eBad, p ? p.eBad : null, true, v => eur(v))}</div></div>
+  </div>
+  <div class="grid2" style="margin-top:10px"><div class="panel"><h3 style="font-size:14px;margin-bottom:10px">Resultado por mes</h3><div class="chartbox">${monthChart(ks.slice(-12), M, lab)}</div><div class="legend"><span><i style="background:var(--ok)"></i>Entregadas</span><span><i style="background:var(--warn)"></i>En curso</span><span><i style="background:var(--bad)"></i>Perdidas</span><span>Línea = tasa de entrega</span></div></div>
+  <div class="panel"><h3 style="font-size:14px;margin-bottom:10px">Tasa de entrega por mes</h3>${ks.slice(-12).map(k => { const r = rate(M[k]); return `<div style="display:grid;grid-template-columns:110px 1fr 44px;gap:10px;align-items:center;font-size:12.5px;margin-bottom:6px"><span>${esc(lab(k))}</span><span style="display:block;height:12px;background:var(--sunk);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:${r == null ? 0 : r * 100}%;background:var(--ok)"></i></span><span class="num" style="text-align:right">${r == null ? '—' : Math.round(r * 100) + '%'}</span></div>`; }).join('')}</div></div>
+  <div class="tablebox" style="margin-top:10px"><table style="min-width:900px"><thead><tr><th>Mes</th><th>Incidencias</th><th>Al día</th><th>Gestionadas</th><th>No gestionadas</th><th>Entregadas</th><th>Devueltas</th><th>En curso</th><th>Tasa entrega</th><th>Rescate reintentos</th><th>Cobrado</th><th>Perdido</th></tr></thead><tbody>${ks.slice().reverse().map(k => { const o = M[k], r = rate(o); return `<tr${k === cur ? ' style="background:var(--accent-soft)"' : ''}><td><b>${esc(lab(k))}</b>${k === cur ? ' <span class="pill p-acc">en curso</span>' : ''}</td><td class="num">${o.t}</td><td class="num">${n1(o.t / days(k))}</td><td class="num">${o.g} <span class="muted">${pct(o.g, o.t)}</span></td><td class="num" style="${o.sinAbiertas ? 'color:var(--bad);font-weight:600' : ''}">${o.n}</td><td class="num" style="color:var(--ok)">${o.ok}</td><td class="num" style="color:var(--bad)">${o.bad}</td><td class="num">${o.cur}</td><td class="num"><b>${r == null ? '—' : Math.round(r * 100) + '%'}</b></td><td class="num">${pct(o.retOk, o.retCl)} <span class="muted">${o.retOk}/${o.retCl}</span></td><td class="num">${eur(o.eOk)}</td><td class="num">${eur(o.eBad)}</td></tr>`; }).join('')}</tbody></table></div></section>`;
+}
+function monthChart(ks, M, lab) {
+  const max = Math.max(...ks.map(k => M[k].t)); const step = max > 80 ? 20 : max > 40 ? 10 : 5; const top = Math.max(step, Math.ceil(max / step) * step);
+  const W = Math.max(480, ks.length * 70 + 70), H = 230, pl = 34, pr = 36, pb = 26, pt = 14, cw = (W - pl - pr) / ks.length, bw = Math.min(40, cw * .6), y = v => pt + (H - pt - pb) * (1 - v / top), yr = v => pt + (H - pt - pb) * (1 - v);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:${Math.min(W, 480)}px;display:block" role="img" aria-label="Incidencias por mes">`;
+  for (let v = 0; v <= top; v += step) s += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${pl - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  [0, .5, 1].forEach(v => s += `<text x="${W - pr + 6}" y="${yr(v) + 4}">${v * 100}%</text>`);
+  const pts = [];
+  ks.forEach((k, i) => { const o = M[k], x = pl + i * cw + (cw - bw) / 2; let acc = 0; [['ok', 'var(--ok)'], ['cur', 'var(--warn)'], ['bad', 'var(--bad)']].forEach(([f, col]) => { if (!o[f]) return; const y1 = y(acc + o[f]), y0 = y(acc); s += `<rect x="${x}" y="${y1}" width="${bw}" height="${y0 - y1}" fill="${col}"><title>${lab(k)}: ${o[f]}</title></rect>`; acc += o[f]; });
+    s += `<text x="${x + bw / 2}" y="${y(acc) - 4}" text-anchor="middle" style="fill:var(--fg)">${acc}</text><text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${lab(k).slice(0, 3)} ${k.slice(2, 4)}</text>`;
+    if (o.ok + o.bad) pts.push([x + bw / 2, yr(o.ok / (o.ok + o.bad))]); });
+  if (pts.length > 1) s += `<polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
+  pts.forEach(p => s += `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="var(--accent)" stroke="#fff" stroke-width="1.5"/>`);
+  return s + '</svg>';
+}
+function weekly(rows) {
+  const wk = d => { const x = new Date(String(d).replace(' ', 'T')); const day = (x.getUTCDay() + 6) % 7; x.setUTCDate(x.getUTCDate() - day); return x.toISOString().slice(0, 10); };
+  const m = {}; rows.forEach(r => { if (!r.rep) return; const k = wk(r.rep); m[k] = m[k] || { ok: 0, cur: 0, bad: 0 }; m[k][r.c.fin === 'entregado' ? 'ok' : r.c.fin === 'perdido' ? 'bad' : 'cur']++; });
+  const ks = Object.keys(m).sort().slice(-16); if (!ks.length) return '<p class="muted">Sin fechas</p>';
+  const max = Math.max(...ks.map(k => m[k].ok + m[k].cur + m[k].bad)); const step = max > 40 ? 20 : max > 20 ? 10 : 5; const top = Math.max(step, Math.ceil(max / step) * step);
+  const W = Math.max(520, ks.length * 38 + 50), H = 220, pl = 34, pb = 26, pt = 10, cw = (W - pl - 8) / ks.length, bw = Math.min(26, cw * .66), y = v => pt + (H - pt - pb) * (1 - v / top);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:${Math.min(W, 520)}px;display:block" role="img" aria-label="Incidencias por semana">`;
+  for (let v = 0; v <= top; v += step) s += `<line x1="${pl}" x2="${W - 8}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${pl - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  ks.forEach((k, i) => { const v = m[k], x = pl + i * cw + (cw - bw) / 2; let acc = 0; [['ok', 'var(--ok)'], ['cur', 'var(--warn)'], ['bad', 'var(--bad)']].forEach(([f, col]) => { if (!v[f]) return; const y1 = y(acc + v[f]), y0 = y(acc); s += `<rect x="${x}" y="${y1}" width="${bw}" height="${y0 - y1}" fill="${col}"><title>Semana del ${fmtD(k)}: ${v[f]}</title></rect>`; acc += v[f]; });
+    s += `<text x="${x + bw / 2}" y="${y(acc) - 4}" text-anchor="middle" style="fill:var(--fg)">${acc}</text>`;
+    if (ks.length <= 10 || i % 2 === 0) s += `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${fmtD(k)}</text>`; });
+  return s + '</svg>';
+}
+function table(rows, newSet) {
+  const t = state.tab, q = state.q.trim().toLowerCase();
+  let list = rows.filter(r => t === 'todas' ? true : t === 'accion' ? r.c.accion : t === 'nuevas' ? newSet.has(r.id) : t === 'zombie' ? r.c.zombie : t === 'error' ? (r.c.errs > 0 && r.c.fin === 'curso') : r.c.bucket === t);
+  if (state.cou) list = list.filter(r => r.cou === state.cou);
+  if (state.tipo) list = list.filter(r => (r.tipo || r.ext || 'Otro') === state.tipo);
+  if (q) list = list.filter(r => [r.ref, r.cli, r.trk].join(' ').toLowerCase().includes(q));
+  const sk = { rep: r => r.rep || '', ref: r => +String(r.ref).replace(/\D/g, ''), tot: r => +r.tot || 0, age: r => r.c.age, lu: r => r.lu || '' }[state.sort] || (r => r.rep);
+  list.sort((a, b) => (sk(a) > sk(b) ? 1 : sk(a) < sk(b) ? -1 : 0) * state.dir);
+  const th = (k, l) => `<th data-sort="${k}">${l}${state.sort === k ? (state.dir < 0 ? ' ↓' : ' ↑') : ''}</th>`;
+  let h = `<table><thead><tr><th class="sev"></th>${th('ref', 'Pedido')}<th>Cliente</th><th>Mensajería · tracking</th><th>Motivo</th>${th('rep', 'Reportada')}${th('age', 'Días')}<th>Gestión</th><th>Estado incidencia</th>${th('lu', 'Tracking actual')}${th('tot', 'Importe')}</tr></thead><tbody>`;
+  if (!list.length) h += `<tr><td colspan="11" class="empty">No hay incidencias en esta vista.</td></tr>`;
+  list.forEach(r => { const b = BUCKET[r.c.bucket]; const isNew = newSet.has(r.id);
+    const gest = r.c.last ? `<b>${esc(r.c.last.n)}</b><div class="muted" style="font-size:12px">${esc(fmtDT(r.c.last.d))}${r.c.errs ? ` · <span style="color:var(--bad)">${r.c.errs} fallida${r.c.errs > 1 ? 's' : ''}</span>` : ''}</div>` : '<span style="color:var(--bad);font-weight:600">Sin acción</span>';
+    h += `<tr class="row" data-id="${esc(r.id)}"><td class="sev ${b.sev}"></td><td><b class="mono">${esc(r.ref)}</b>${isNew ? ' <span class="pill p-new">Nueva</span>' : ''}</td><td>${esc(r.cli)}</td><td>${esc(r.cou)}<div>${r.url ? `<a class="mono" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.trk)}</a>` : `<span class="mono">${esc(r.trk)}</span>`}</div></td><td>${esc(r.tipo || '')}<div class="muted" style="font-size:12px">${esc(r.ext || '')}</div></td><td class="num">${esc(fmtD(r.rep))}</td><td class="num">${r.st === 'pending' ? Math.floor(r.c.age) : '<span class="muted">—</span>'}</td><td>${gest}</td><td><span class="pill ${b.p}">${b.l}</span><div class="muted" style="font-size:12px;margin-top:3px">Beeping: ${r.st === 'pending' ? 'pendiente' : r.st === 'resolved' ? 'resuelta' : esc(r.st)}</div></td><td>${shipPill(r.ship)}<div class="muted" style="font-size:12px;margin-top:3px">${esc(fmtDT(r.lu))}</div></td><td class="num">${eur(r.tot)}</td></tr>`;
+    if (state.open[r.id]) h += `<tr class="det"><td colspan="11"><div class="hist">${r.h.length ? r.h.map(a => `<div><span class="muted num">${esc(fmtDT(a.d))}</span><span><span class="pill ${a.s === 'ok' ? 'p-ok' : 'p-bad'}">${a.s === 'ok' ? 'OK' : 'Error'}</span> <b>${esc(a.n)}</b>${a.o ? ` · <span class="muted">${esc(a.o)}</span>` : ''}</span></div>`).join('') : '<div><span class="muted">—</span><span>No se ha enviado ninguna acción para esta incidencia.</span></div>'}<div><span class="muted">Pedido creado</span><span>${esc(fmtD(r.oc))}${r.res ? ` · incidencia cerrada ${esc(fmtDT(r.res))}` : ''}</span></div></div></td></tr>`;
+  });
+  h += '</tbody></table>';
+  const box = $('#tbl'); box.innerHTML = h;
+  box.querySelectorAll('th[data-sort]').forEach(e => e.onclick = () => { const k = e.dataset.sort; state.dir = state.sort === k ? -state.dir : -1; state.sort = k; table(rows, newSet); });
+  box.querySelectorAll('tr.row').forEach(e => e.onclick = ev => { if (ev.target.closest('a')) return; const id = e.dataset.id; state.open[id] = !state.open[id]; table(rows, newSet); });
+}
+
+/* Código del marcador: la función de arriba con la URL de Supabase y del CRM incrustadas */
+const crmUrl = location.origin + '/#logistica';
+$('#bmCode').value = 'javascript:(' + marcadorBeeping.toString().replace(/\n\s*/g, ' ') + ')(' + JSON.stringify(SB) + ',' + JSON.stringify(K) + ',' + JSON.stringify(crmUrl) + ');void 0';
+$('#btnSync').onclick = () => { $('#syncSec').hidden = false; $('#syncSec').scrollIntoView({ behavior: 'smooth' }); };
+$('#btnCloseSync').onclick = () => { $('#syncSec').hidden = true; };
+$('#btnReload').onclick = () => load(false);
+$('#btnCopyBm').onclick = async () => { const t = $('#bmCode'); try { await navigator.clipboard.writeText(t.value); toast('Código del marcador copiado'); } catch (e) { t.focus(); t.select(); toast('Selecciónalo y cópialo con Ctrl+C / Cmd+C'); } };
+$('#btnImport').onclick = () => importText($('#pasteBox').value);
+$('#fileIn').onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => importText(r.result); r.readAsText(f); };
+document.addEventListener('paste', e => { const tgt = e.target; if (tgt && tgt.id === 'q') return; const txt = (e.clipboardData || window.clipboardData).getData('text'); if (txt && txt.indexOf('beeping-incidencias') > -1) { e.preventDefault(); importText(txt); } });
+const drop = $('#drop'); ['dragover', 'dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('on'); })); ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, () => drop.classList.remove('on')));
+drop.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) { const r = new FileReader(); r.onload = () => importText(r.result); r.readAsText(f); } });
+load(false);
+setInterval(() => { if (!document.hidden) load(true); }, 60000);
+})();
+</script>
+</body>
+</html>

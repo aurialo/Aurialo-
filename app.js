@@ -570,7 +570,11 @@ views.logistica = () => {
         { k: "a", label: "", h: r => `<button class="btn sm sec" data-edit="confirmaciones:${r.id}">Editar</button> <button class="btn sm danger" data-del="confirmaciones:${r.id}">Borrar</button>` }],
         [...db.confirmaciones].sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")), "Cada persona apunta al final del día cuántos pedidos confirmó, canceló o no contestaron");
   } else if (tab === "inc") {
-    const f = ui.filters.inc || (ui.filters.inc = { est: "abiertas" });
+    const f = ui.filters.inc || (ui.filters.inc = { est: "abiertas", modo: "beeping" });
+    const sw = `<div class="tabs" style="border:0;margin-bottom:10px">${[["beeping", "📦 Beeping (automático)"], ["manual", "✍️ Registro manual"]].map(([k, l]) => `<button data-incmodo="${k}" class="${(f.modo || "beeping") === k ? "active" : ""}">${l}</button>`).join("")}</div>`;
+    if ((f.modo || "beeping") === "beeping") {
+      body = sw + `<iframe id="inc-frame" src="incidencias.html" title="Incidencias de Beeping" style="width:100%;border:0;min-height:700px;display:block"></iframe>`;
+    } else {
     const rows = db.incidencias.filter(i => f.est === "todas" || (f.est === "abiertas" ? ["Abierta", "Gestionada"].includes(i.estado) : i.estado === f.est))
       .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
     body = `<div class="grid">${ESTADOS_INC.map(e => kpi(e, db.incidencias.filter(i => i.estado === e).length)).join("")}</div>
@@ -582,6 +586,8 @@ views.logistica = () => {
         { k: "estado", label: "Estado", h: r => `<span class="pill ${{ Abierta: "bad", Gestionada: "warn", Resuelta: "ok", "No resuelta": "brand" }[r.estado] || ""}">${esc(r.estado)}</span>` },
         { k: "responsable", label: "Responsable" }, { k: "notas", label: "Notas", v: r => (r.notas || "").slice(0, 50) },
         { k: "a", label: "", h: r => `<button class="btn sm sec" data-edit="incidencias:${r.id}">Editar</button> <button class="btn sm danger" data-del="incidencias:${r.id}">Borrar</button>` }], rows, "Sin incidencias en este filtro");
+    body = sw + body;
+    }
   } else {
     const order = { Alta: 0, Media: 1, Baja: 2 };
     body = `<div class="toolbar"><span class="grow"></span><button class="btn" id="new-tar">+ Tarea</button></div>
@@ -600,6 +606,9 @@ views.logistica.bind = () => {
   on("#new-inc", () => openForm("Nueva incidencia", F_INC, { responsable: me(), estado: "Abierta" }, r => save("incidencias", r)));
   on("#new-tar", () => openForm("Nueva tarea", F_TAR, { responsable: me(), estado: "Pendiente" }, r => save("tareas", r)));
   const s = $("#fi-est"); if (s) s.onchange = e => { ui.filters.inc.est = e.target.value; render(); };
+  document.querySelectorAll("[data-incmodo]").forEach(bt => bt.onclick = () => { ui.filters.inc.modo = bt.dataset.incmodo; render(); });
+  const fr = $("#inc-frame");
+  if (fr) { clearInterval(fr._h); const fit = () => { try { const h = fr.contentDocument.documentElement.scrollHeight; if (h && Math.abs(fr.offsetHeight - h) > 4) fr.style.height = h + "px"; } catch (e) {} }; fr.onload = fit; window._incFit && clearInterval(window._incFit); window._incFit = setInterval(fit, 700); }
   const fb = ui.filters.bee;
   const p = $("#fb-preset"); if (p) p.onchange = e => { fb.preset = e.target.value; if (fb.preset === "custom" && !fb.desde) { fb.desde = $("#fb-desde").value; fb.hasta = $("#fb-hasta").value; } render(); };
   const fix = () => { fb.desde = $("#fb-desde").value; fb.hasta = $("#fb-hasta").value; if (fb.desde && fb.hasta && fb.desde > fb.hasta) [fb.desde, fb.hasta] = [fb.hasta, fb.desde]; fb.preset = "custom"; render(); };
@@ -737,6 +746,6 @@ $("#yo").onchange = e => { localStorage.setItem("crm_yo", e.target.value); rende
     await save("sistema", { id: "seed", fecha: today() });
   }
   render();
-  setInterval(async () => { if (!$("#modal").classList.contains("hidden") || ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) return; await load(); if (!C.beepingCsvUrl || Date.now() - new Date(beeping.fecha || 0).getTime() > 5 * 60e3) await loadBeeping(); render(); }, C.refrescoSegundos * 1000);
+  setInterval(async () => { if (!$("#modal").classList.contains("hidden") || ["INPUT", "TEXTAREA", "IFRAME"].includes(document.activeElement?.tagName) || $("#inc-frame")) return; await load(); if (!C.beepingCsvUrl || Date.now() - new Date(beeping.fecha || 0).getTime() > 5 * 60e3) await loadBeeping(); render(); }, C.refrescoSegundos * 1000);
 })();
 })();

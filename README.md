@@ -57,3 +57,9 @@ El CRM lee la pestaña **Registro-Base** del Sheet «Control Contable de Tienda 
 Fórmulas (iguales que el Informe Contable): % Confirmación = confirmados / generados · % Entrega = entregados / confirmados · Beneficio = importe entregado − costes de producto y logística − publicidad · % Beneficio = beneficio / importe entregado.
 
 Mientras no haya enlace, el CRM muestra la última copia guardada en Supabase.
+
+## Incidencias de Beeping
+
+`incidencias.html` (dentro de Equipo logístico → Incidencias) es el panel de incidencias de Beeping: alertas, embudo de gestión, dinero cobrado / en juego / perdido, mes a mes, desglose por motivo, mensajería y acción, tabla con historial de gestiones y registro de cambios.
+
+Los datos llegan con un **marcador de Chrome** que se ejecuta en `newapp.gobeeping.com` con tu sesión iniciada: lee las incidencias, sus gestiones y el tracking, y las envía directamente a Supabase (`beeping:inc:raw`). El CRM las procesa, calcula los cambios desde la última vez y guarda el resultado en `beeping:inc:data`, así que todo el equipo ve lo mismo. El código del marcador está en el botón «Actualizar desde Beeping». Si el envío directo fallara, el marcador permite copiar los datos y pegarlos en el CRM.
