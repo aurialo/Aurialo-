@@ -21,10 +21,11 @@ window.AURIALO_CONFIG = {
   // ticket medio, unidades por pedido, coste unitario y costes logísticos del Sheet contable).
   // cpaMax / roasBE: por pedido generado (lo que mide Meta). cpaObj / roasObj: dejando un 20 % de beneficio.
   // cpaMaxEnt / roasBEEnt: por pedido entregado (como el CPA y ROAS del Informe Contable).
+  // cpaMaxMin / roasBEMin: si todos los pedidos fueran la oferta mínima (GLP 3 uds, MENO 2 uds, Drenaje 1 ud).
   productos: [
-    { code: "GLP1", nombre: "Parches GLP-1", ticket: 31.80, uds: 3.16, costeUd: 0.40, conf: 0.788, entrega: 0.827, cpaMax: 13.36, roasBE: 2.38, cpaObj: 9.22, roasObj: 3.45, cpaMaxEnt: 20.51, roasBEEnt: 1.55 },
-    { code: "MENO", nombre: "MENO", ticket: 33.38, uds: 2.34, costeUd: 1.79, conf: 0.802, entrega: 0.795, cpaMax: 11.96, roasBE: 2.79, cpaObj: 7.70, roasObj: 4.34, cpaMaxEnt: 18.76, roasBEEnt: 1.78 },
-    { code: "DRENAJE", nombre: "Drenaje Linfático", ticket: 32.68, uds: 1.19, costeUd: 2.14, conf: 0.714, entrega: 0.646, cpaMax: 7.98, roasBE: 4.09, cpaObj: 4.96, roasObj: 6.58, cpaMaxEnt: 17.29, roasBEEnt: 1.89 },
+    { code: "GLP1", nombre: "Parches GLP-1", ticket: 31.80, uds: 3.16, costeUd: 0.40, conf: 0.788, entrega: 0.827, cpaMax: 13.36, roasBE: 2.38, cpaObj: 9.22, roasObj: 3.45, cpaMaxEnt: 20.51, roasBEEnt: 1.55, ofertaMin: "3 uds · 29,99 €", cpaMaxMin: 12.23, roasBEMin: 2.45 },
+    { code: "MENO", nombre: "MENO", ticket: 33.38, uds: 2.34, costeUd: 1.79, conf: 0.802, entrega: 0.795, cpaMax: 11.96, roasBE: 2.79, cpaObj: 7.70, roasObj: 4.34, cpaMaxEnt: 18.76, roasBEEnt: 1.78, ofertaMin: "2 uds · 29,99 €", cpaMaxMin: 10.18, roasBEMin: 2.95 },
+    { code: "DRENAJE", nombre: "Drenaje Linfático", ticket: 32.68, uds: 1.19, costeUd: 2.14, conf: 0.714, entrega: 0.646, cpaMax: 7.98, roasBE: 4.09, cpaObj: 4.96, roasObj: 6.58, cpaMaxEnt: 17.29, roasBEEnt: 1.89, ofertaMin: "1 ud · 29,90 €", cpaMaxMin: 6.89, roasBEMin: 4.34 },
     { code: "MAGNESIO", nombre: "Magnesium Complex" },
     { code: "BOTOX", nombre: "Botox en Barra" },
     { code: "TIRAS", nombre: "Tiras Dentales" },
