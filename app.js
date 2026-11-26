@@ -666,7 +666,8 @@ const adsLib = c => c.adsLibraryUrl || `https://www.facebook.com/ads/library/?ac
 const F_COMP = [
   { k: "nombre", label: "Marca" }, { k: "producto", label: "Compite con", type: "select", opts: prodOpts() },
   { k: "web", label: "Web" }, { k: "adsLibraryUrl", label: "URL en Ads Library", hint: "Si lo dejas vacío, se busca por nombre" },
-  { k: "precio", label: "Precio / oferta" }, { k: "notas", label: "Notas", type: "textarea", full: 1 }];
+  { k: "oferta", label: "Precio / oferta" }, { k: "anunciosActivos", label: "Anuncios activos", type: "number" }, { k: "nuevos7d", label: "Nuevos en 7 días", type: "number" },
+  { k: "angulos", label: "Ángulos principales", full: 1 }, { k: "notas", label: "Notas", type: "textarea", full: 1 }];
 const fAnuncio = () => [
   { k: "competidor", label: "Competidor", type: "select", opts: db.competidores.map(c => [c.id, c.nombre]) },
   { k: "fechaVisto", label: "Visto el", type: "date", def: today() },
@@ -682,15 +683,18 @@ views.competencia = () => {
   if (tab === "comp") {
     body = `<div class="toolbar"><span class="grow"></span><button class="btn" id="new-comp">+ Competidor</button></div>` + table("comp", [
       { k: "nombre", label: "Marca", h: c => `<span class="name">${esc(c.nombre)}</span>` }, { k: "producto", label: "Compite con", v: c => prodName(c.producto) },
-      { k: "precio", label: "Precio / oferta" },
-      { k: "nAnu", label: "Anuncios vistos", num: 1, v: c => db.anuncios.filter(a => a.competidor === c.id).length },
-      { k: "max", label: "Máx. días activo", num: 1, v: c => Math.max(0, ...db.anuncios.filter(a => a.competidor === c.id).map(a => n(a.diasActivo))) },
+      { k: "anunciosActivos", label: "Anuncios activos", num: 1, v: c => c.anunciosActivos ?? "", h: c => c.anunciosActivos != null && c.anunciosActivos !== "" ? `<b>${c.anunciosActivos}</b>` : `<span class="hint">—</span>` },
+      { k: "nuevos7d", label: "Nuevos 7 días", num: 1, v: c => c.nuevos7d ?? "", h: c => c.nuevos7d ? `<span class="pill ${n(c.nuevos7d) >= 10 ? "bad" : "warn"}">+${c.nuevos7d}</span>` : `<span class="hint">—</span>` },
+      { k: "max", label: "Más longevo (días)", num: 1, v: c => Math.max(n(c.masLongevoDias), 0, ...db.anuncios.filter(a => a.competidor === c.id).map(a => n(a.diasActivo))) },
+      { k: "oferta", label: "Oferta", h: c => `<span style="white-space:normal">${esc(c.oferta || c.precio || "")}</span>` },
+      { k: "angulos", label: "Ángulos", h: c => `<span style="white-space:normal;font-size:12px">${esc(c.angulos || "")}</span>` },
+      { k: "nAnu", label: "Anuncios guardados", num: 1, v: c => db.anuncios.filter(a => a.competidor === c.id).length },
       { k: "links", label: "", h: c => `<a class="btn sm sec" href="${esc(adsLib(c))}" target="_blank" rel="noopener">Ads Library</a>${c.web ? ` <a class="btn sm sec" href="${esc(c.web)}" target="_blank" rel="noopener">Web</a>` : ""}` },
       { k: "a", label: "", h: c => `<button class="btn sm sec" data-edit="competidores:${c.id}">Editar</button> <button class="btn sm danger" data-del="competidores:${c.id}">Borrar</button>` }],
       db.competidores, "Sin competidores");
   } else if (tab === "anu") {
     body = `<div class="toolbar"><span class="hint">Apunta los anuncios que ves en la Ads Library, sobre todo los que llevan muchos días activos.</span><span class="grow"></span><button class="btn" id="new-anu">+ Anuncio visto</button></div>` + table("anu", [
-      { k: "fechaVisto", label: "Visto", h: a => fdate(a.fechaVisto) }, { k: "competidor", label: "Competidor", v: a => cName(a.competidor) },
+      { k: "fechaVisto", label: "Visto", h: a => fdate(a.ultimaVez || a.fechaVisto) }, { k: "competidor", label: "Competidor", v: a => cName(a.competidor) },
       { k: "prod", label: "Producto", v: a => prodName(cProd(a.competidor)) }, { k: "angulo", label: "Ángulo" }, { k: "formato", label: "Formato" },
       { k: "diasActivo", label: "Días activo", num: 1, v: a => n(a.diasActivo) }, { k: "oferta", label: "Oferta" }, { k: "hook", label: "Hook", v: a => (a.hook || "").slice(0, 50) },
       { k: "a", label: "", h: a => `${a.link ? `<a class="btn sm sec" href="${esc(a.link)}" target="_blank" rel="noopener">Ver</a> ` : ""}<button class="btn sm sec" data-edit="anuncios:${a.id}">Editar</button> <button class="btn sm danger" data-del="anuncios:${a.id}">Borrar</button>` }],
@@ -708,7 +712,12 @@ views.competencia = () => {
       { k: "probado", label: "¿Lo usamos?", v: x => x.probado ? 1 : 0, h: x => x.probado ? `<span class="pill ok">Ya probado</span>` : `<span class="pill warn">Sin probar</span>` }],
       rows, "Registra anuncios para ver los ángulos");
   }
-  return `<h1>Competencia</h1><div class="sub">Qué hacen Resilea, Sonvital, Menoesp y compañía, y qué ángulos les funcionan.</div>${tabsHtml}${body}`;
+  const R = db.sistema.find(x => x.id === "competencia");
+  const rep = R ? `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0">🤖 Informe del agente${R.semana ? " · semana del " + fdate(R.semana) : ""}</h3>
+    <span class="hint">Actualizado ${new Date(R.fecha).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}${R.docUrl ? ` · <a href="${esc(R.docUrl)}" target="_blank" rel="noopener">Ver informe completo</a>` : ""}</span></div>
+    <div class="two" style="margin-top:8px"><div><b>Resumen</b><ul class="rules">${(R.resumen || []).map(l => `<li>${esc(l)}</li>`).join("")}</ul></div>
+    <div><b>Qué probar esta semana</b><ol class="rules">${(R.acciones || []).map(l => `<li>${esc(l)}</li>`).join("")}</ol></div></div></div>` : "";
+  return `<h1>Competencia</h1><div class="sub">Qué hacen Resilea, Sonvital, Menoesp y compañía, y qué ángulos les funcionan.</div>${rep}${tabsHtml}${body}`;
 };
 views.competencia.bind = () => {
   const b = $("#new-comp"); if (b) b.onclick = () => openForm("Nuevo competidor", F_COMP, {}, r => save("competidores", r));
