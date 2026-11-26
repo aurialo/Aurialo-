@@ -177,8 +177,8 @@ views.panel = () => {
   const hace7 = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
   const conf7 = db.confirmaciones.filter(c => c.fecha >= hace7);
   const cOk = conf7.reduce((a, c) => a + n(c.confirmados), 0), cTot = conf7.reduce((a, c) => a + n(c.confirmados) + n(c.cancelados) + n(c.noContesta), 0);
-  const top = cr.filter(x => x.k.compras > 0).sort((a, b) => n(b.k.roas) - n(a.k.roas)).slice(0, 5);
-  const malos = cr.filter(x => x.k.veredicto === "No relanzar").slice(0, 5);
+  const top = cr.filter(x => x.k.compras > 0 && x.k.gasto >= C.reglas.gastoMinimo).sort((a, b) => n(b.k.roas) - n(a.k.roas)).slice(0, 5);
+  const malos = cr.filter(x => x.k.veredicto === "No relanzar").sort((a, b) => b.k.gasto - a.k.gasto).slice(0, 5);
   return `<h1>Panel</h1><div class="sub">Hola ${esc(me())}. Así va Aurialo hoy.</div>
   <div class="grid">
     ${kpi("Gasto en creativos", eur(gasto), `${cr.length} creativos registrados`)}
@@ -232,18 +232,19 @@ function editCreativo(rec) {
 }
 views.meta = () => {
   const [tab, tabsHtml] = tabs("meta", [["lista", "Creativos"], ["angulos", "Por ángulo"], ["formatos", "Por formato"]]);
-  const f = ui.filters.meta || (ui.filters.meta = { prod: "", ver: "", q: "" });
+  const f = ui.filters.meta || (ui.filters.meta = { prod: "", ver: "", q: "", act: false });
   let rows = db.creativos.map(r => ({ r, k: m(r) }))
-    .filter(x => (!f.prod || x.r.producto === f.prod) && (!f.ver || x.k.veredicto === f.ver) && (!f.q || (x.r.nombre || "").toLowerCase().includes(f.q.toLowerCase())));
+    .filter(x => (!f.act || x.r.estadoMeta === "ACTIVE") && (!f.prod || x.r.producto === f.prod) && (!f.ver || x.k.veredicto === f.ver) && (!f.q || (x.r.nombre || "").toLowerCase().includes(f.q.toLowerCase())));
   const toolbar = `<div class="toolbar">
     <select id="f-prod">${prodOpts("Todos los productos").map(([v, l]) => `<option value="${v}" ${v === f.prod ? "selected" : ""}>${l}</option>`).join("")}</select>
     <select id="f-ver">${["", "Ganador", "Prometedor", "Vigilar", "No relanzar", "En test"].map(v => `<option value="${v}" ${v === f.ver ? "selected" : ""}>${v || "Todos los estados"}</option>`).join("")}</select>
-    <input id="f-q" placeholder="Buscar creativo…" value="${esc(f.q)}"><span class="grow"></span>
+    <input id="f-q" placeholder="Buscar creativo…" value="${esc(f.q)}"><label class="hint"><input type="checkbox" id="f-act" ${f.act ? "checked" : ""}> Solo activos en Meta</label><span class="grow"></span>
     <button class="btn sec" id="imp-meta">⬆️ Importar CSV de Meta</button><button class="btn" id="new-cr">+ Creativo</button></div>`;
   let body = "";
   if (tab === "lista") {
     body = table("meta", [
-      { k: "nombre", label: "Creativo", h: x => `<span class="name">${esc(x.r.nombre)}</span>`, v: x => x.r.nombre },
+      { k: "nombre", label: "Creativo", h: x => `<span class="name">${esc(x.r.nombre)}</span>${x.r.conjunto ? `<div class="hint">${esc(x.r.campana || "")} › ${esc(x.r.conjunto)}</div>` : ""}`, v: x => x.r.nombre },
+      { k: "estadoMeta", label: "En Meta", v: x => x.r.estadoMeta || "", h: x => x.r.estadoMeta ? (x.r.estadoMeta === "ACTIVE" ? `<span class="pill ok">Activo</span>` : `<span class="hint">${esc(x.r.estadoMeta === "DISAPPROVED" ? "Rechazado" : "Pausado")}</span>`) : "" },
       { k: "producto", label: "Producto", v: x => prodName(x.r.producto) },
       { k: "formato", label: "Formato", v: x => x.r.formato || "—" },
       { k: "fechaLanz", label: "Lanzado", v: x => x.r.fechaLanz, h: x => fdate(x.r.fechaLanz) },
@@ -278,12 +279,15 @@ views.meta = () => {
       { k: "dec", label: "Decisión", v: dec, h: a => { const d = dec(a); return `<span class="pill ${{ "Escalar / iterar": "ok", "Seguir probando": "info", "Abandonar": "bad" }[d] || "brand"}">${d}</span>`; } }
     ], agg, "Sin datos");
   }
-  return `<h1>Meta Ads · Creativos</h1><div class="sub">Cada vídeo o imagen lanzado, si ha funcionado o no, y qué ángulos merece la pena iterar. ROAS corregido con compras reales de Shopify cuando las indicas.</div>${tabsHtml}${toolbar}${body}`;
+  const sync = db.sistema.find(s => s.id === "metasync");
+  const syncTxt = sync ? `<span class="pill brand">🤖 Agente Meta · última sincronización ${new Date(sync.fecha).toLocaleString("es-ES", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · ${sync.anuncios} anuncios</span>` : "";
+  return `<h1>Meta Ads · Creativos</h1><div class="sub">Cada vídeo o imagen lanzado, si ha funcionado o no, y qué ángulos merece la pena iterar. Métricas acumuladas de cada anuncio; ROAS corregido con compras reales de Shopify cuando las indicas.</div><div class="banner">${syncTxt}</div>${tabsHtml}${toolbar}${body}`;
 };
 views.meta.bind = () => {
   const f = ui.filters.meta;
   $("#f-prod").onchange = e => { f.prod = e.target.value; render(); };
   $("#f-ver").onchange = e => { f.ver = e.target.value; render(); };
+  $("#f-act").onchange = e => { f.act = e.target.checked; render(); };
   $("#f-q").oninput = e => { f.q = e.target.value; clearTimeout(f._t); f._t = setTimeout(() => { render(); const q = $("#f-q"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }, 300); };
   $("#new-cr").onclick = () => editCreativo();
   $("#imp-meta").onclick = importMeta;

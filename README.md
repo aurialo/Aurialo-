@@ -39,3 +39,9 @@ Para probarlo sin publicar, basta con abrir `index.html` en el navegador.
 ## Cambiar reglas o listas
 
 Todo se edita en `config.js`: miembros del equipo, productos, formatos, herramientas, competidores iniciales, umbrales del estado automático (ROAS, compras y días mínimos) y reglas creativas.
+
+## Agente de Meta Ads
+
+`scripts/meta_sync.py` vuelca al CRM las métricas acumuladas de cada anuncio de la cuenta **Aurialo 1** (gasto, impresiones, clics, compras y valor de compras, más campaña, conjunto y estado en Meta). Una tarea programada de Claude lo ejecuta los lunes, miércoles y viernes por la mañana: consulta Meta Ads, actualiza el CRM y deja un resumen de qué creativos escalar, cuáles vigilar y cuáles no relanzar.
+
+Cada anuncio se guarda como `crm:creativos:meta_<id>`. Lo que el equipo escriba a mano en el CRM (notas, compras reales de Shopify, ticket medio, estado forzado o ángulo/formato corregidos) no se sobrescribe.
