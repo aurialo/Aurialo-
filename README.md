@@ -63,3 +63,7 @@ Mientras no haya enlace, el CRM muestra la última copia guardada en Supabase.
 `incidencias.html` (dentro de Equipo logístico → Incidencias) es el panel de incidencias de Beeping: alertas, embudo de gestión, dinero cobrado / en juego / perdido, mes a mes, desglose por motivo, mensajería y acción, tabla con historial de gestiones y registro de cambios.
 
 Los datos llegan con un **marcador de Chrome** que se ejecuta en `newapp.gobeeping.com` con tu sesión iniciada: lee las incidencias, sus gestiones y el tracking, y las envía directamente a Supabase (`beeping:inc:raw`). El CRM las procesa, calcula los cambios desde la última vez y guarda el resultado en `beeping:inc:data`, así que todo el equipo ve lo mismo. El código del marcador está en el botón «Actualizar desde Beeping». Si el envío directo fallara, el marcador permite copiar los datos y pegarlos en el CRM.
+
+## Motivos de rechazo
+
+`scripts/motivos_sync.py` clasifica las observaciones del Sheet **PEDIDOS E INCIDENCIAS** (pestañas Pedidos cancelados, Incidencias devueltas, Carritos recuperados y Pedidos confirmados) en motivos: ya no lo quiere (sin motivo), no contactable, sin dinero, desconfianza, consejo médico, duplicado, error, cambio de circunstancias y devuelto automático por Beeping. También marca si el cliente rechazó el descuento. El resultado se ve en Equipo logístico → Motivos de rechazo. Un agente programado («Motivos de rechazo») lee el Sheet cada día, ejecuta el script y deja un resumen.

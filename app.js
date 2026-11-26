@@ -517,9 +517,37 @@ const F_TAR = [
   { k: "estado", label: "Estado", type: "select", opts: ["Pendiente", "En curso", "Hecha"] }, { k: "fecha", label: "Fecha límite", type: "date" },
   { k: "notas", label: "Notas", type: "textarea", full: 1 }];
 views.logistica = () => {
-  const [tab, tabsHtml] = tabs("logistica", [["res", "Resultados (Beeping)"], ["conf", "Confirmaciones WhatsApp"], ["inc", "Incidencias"], ["tar", "Tareas"]]);
+  const [tab, tabsHtml] = tabs("logistica", [["res", "Resultados (Beeping)"], ["mot", "Motivos de rechazo"], ["conf", "Confirmaciones WhatsApp"], ["inc", "Incidencias"], ["tar", "Tareas"]]);
   let body = "";
-  if (tab === "res") {
+  if (tab === "mot") {
+    const M = db.sistema.find(x => x.id === "motivos");
+    if (!M) body = `<div class="card empty">Aún no hay motivos cargados. El agente «Motivos de rechazo» los saca cada día del Sheet PEDIDOS E INCIDENCIAS.</div>`;
+    else {
+      const f = ui.filters.mot || (ui.filters.mot = { tipo: "", cat: "" });
+      const R = M.registros || [], canc = R.filter(r => r.tipo === "cancelado"), dev = R.filter(r => r.tipo === "devuelto");
+      const sinMot = canc.filter(r => r.categoria.startsWith("Ya no lo quiere")).length;
+      const auto = dev.filter(r => r.categoria.startsWith("Devuelto automático")).length;
+      const desc = R.filter(r => r.rechazaDescuento).length;
+      const bars = (list, titulo) => { const c = {}; list.forEach(r => c[r.categoria] = (c[r.categoria] || 0) + 1); const e = Object.entries(c).sort((a, b) => b[1] - a[1]), mx = Math.max(1, ...e.map(x => x[1]));
+        return `<div class="card"><h3 style="margin:0 0 10px">${titulo} <span class="hint">${list.length}</span></h3>${e.length ? e.map(([k, v]) => `<div style="display:grid;grid-template-columns:220px 1fr 70px;gap:10px;align-items:center;margin:6px 0;font-size:13px;cursor:pointer" data-motcat="${esc(k)}"><span>${esc(k)}</span><div class="bar"><span style="width:${v * 100 / mx}%"></span></div><span class="hint" style="text-align:right">${v} · ${pct(v / list.length)}</span></div>`).join("") : '<span class="hint">Sin registros</span>'}</div>`; };
+      const rows = R.filter(r => (!f.tipo || r.tipo === f.tipo) && (!f.cat || r.categoria === f.cat));
+      body = `<div class="toolbar"><span class="hint">Fuente: ${esc(M.fuente)} · actualizado ${new Date(M.fecha).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span></div>
+      <div class="grid">
+        ${kpi("Pedidos cancelados", canc.length, `${pct(canc.length ? sinMot / canc.length : null)} sin motivo concreto`)}
+        ${kpi("Incidencias devueltas", dev.length, `${auto} automáticas por Beeping sin gestión`)}
+        ${kpi("Rechazan el descuento", desc, "Se les ofreció descuento y dijeron que no")}
+        ${kpi("Carritos recuperados", (M.carritos || []).length, `${(M.carritos || []).filter(c => /entreg/i.test(c.estado)).length} ya entregados`)}
+      </div>
+      <div class="card" style="margin-top:14px"><h3 style="margin:0 0 8px">📝 Resumen</h3><ul class="rules">${(M.resumen || []).map(l => `<li>${esc(l)}</li>`).join("")}</ul></div>
+      <div class="two">${bars(canc, "¿Por qué cancelan en la confirmación?")}${bars(dev, "¿Por qué se devuelven las incidencias?")}</div>
+      <div class="toolbar"><select id="fm-tipo">${[["", "Cancelados y devueltos"], ["cancelado", "Solo cancelados"], ["devuelto", "Solo devueltos"]].map(([v, l]) => `<option value="${v}" ${v === f.tipo ? "selected" : ""}>${l}</option>`).join("")}</select>
+        ${f.cat ? `<span class="pill brand">${esc(f.cat)} <a href="#" id="fm-clear" style="margin-left:6px">✕</a></span>` : `<span class="hint">Pulsa una barra para filtrar por motivo</span>`}</div>` +
+      table("mot", [{ k: "pedido", label: "Pedido", h: r => `<b>#${esc(r.pedido)}</b>` }, { k: "tipo", label: "Tipo", h: r => `<span class="pill ${r.tipo === "cancelado" ? "warn" : "bad"}">${r.tipo === "cancelado" ? "Cancelado" : "Devuelto"}</span>` },
+        { k: "categoria", label: "Motivo" }, { k: "rechazaDescuento", label: "Desc.", v: r => r.rechazaDescuento ? 1 : 0, h: r => r.rechazaDescuento ? "❌ rechazado" : "" },
+        { k: "obs", label: "Lo que anotó el equipo", h: r => `<span style="white-space:normal">${esc(r.obs)}</span>` }], rows) +
+      ((M.carritos || []).length ? `<h2>🛒 Carritos recuperados</h2>` + table("carr", [{ k: "carrito", label: "Carrito" }, { k: "obs", label: "Observación" }, { k: "estado", label: "Estado", h: c => c.estado ? `<span class="pill ok">${esc(c.estado)}</span>` : `<span class="hint">pendiente</span>` }], M.carritos) : "");
+    }
+  } else if (tab === "res") {
     const f = ui.filters.bee || (ui.filters.bee = { preset: "cerrada", desde: "", hasta: "" });
     const [d1, d2] = rangoBeeping(f.preset, f.desde, f.hasta);
     const rows = beeping.rows.filter(r => r.fecha >= d1 && r.fecha <= d2).sort((a, b) => b.fecha.localeCompare(a.fecha));
@@ -606,6 +634,9 @@ views.logistica.bind = () => {
   on("#new-inc", () => openForm("Nueva incidencia", F_INC, { responsable: me(), estado: "Abierta" }, r => save("incidencias", r)));
   on("#new-tar", () => openForm("Nueva tarea", F_TAR, { responsable: me(), estado: "Pendiente" }, r => save("tareas", r)));
   const s = $("#fi-est"); if (s) s.onchange = e => { ui.filters.inc.est = e.target.value; render(); };
+  const fmt = $("#fm-tipo"); if (fmt) fmt.onchange = e => { ui.filters.mot.tipo = e.target.value; render(); };
+  document.querySelectorAll("[data-motcat]").forEach(el => el.onclick = () => { ui.filters.mot.cat = el.dataset.motcat; render(); });
+  const fmc = $("#fm-clear"); if (fmc) fmc.onclick = e => { e.preventDefault(); ui.filters.mot.cat = ""; render(); };
   document.querySelectorAll("[data-incmodo]").forEach(bt => bt.onclick = () => { ui.filters.inc.modo = bt.dataset.incmodo; render(); });
   const fr = $("#inc-frame");
   if (fr) { clearInterval(fr._h); const fit = () => { try { const h = fr.contentDocument.documentElement.scrollHeight; if (h && Math.abs(fr.offsetHeight - h) > 4) fr.style.height = h + "px"; } catch (e) {} }; fr.onload = fit; window._incFit && clearInterval(window._incFit); window._incFit = setInterval(fit, 700); }
