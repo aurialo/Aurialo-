@@ -223,6 +223,14 @@ function veredicto(k) {
   if (k.roas != null && k.roas < R.roasDescartar) return "No relanzar";
   return "Vigilar";
 }
+function rentab(x) {
+  const p = C.productos.find(q => q.code === x.r.producto);
+  if (!p || !p.cpaMax || !x.k.compras) return { t: "", o: 0 };
+  const cpa = x.k.cpa, tt = `CPA ${eur(cpa)} · objetivo ${eur(p.cpaObj)} · máximo ${eur(p.cpaMax)}`;
+  if (cpa <= p.cpaObj) return { t: "Rentable +20 %", c: "ok", o: 3, tt };
+  if (cpa <= p.cpaMax) return { t: "Rentable", c: "warn", o: 2, tt };
+  return { t: "Pierde dinero", c: "bad", o: 1, tt };
+}
 const VCLS = { "Ganador": "ok", "Prometedor": "info", "Vigilar": "warn", "No relanzar": "bad", "En test": "brand", "Sin datos": "" };
 const vpill = v => `<span class="pill ${VCLS[v] || ""}">${esc(v)}</span>`;
 
@@ -328,6 +336,7 @@ views.meta = () => {
       { k: "compras", label: "Compras", num: 1, v: x => x.k.compras, h: x => x.k.compras },
       { k: "cpa", label: "CPA", num: 1, v: x => x.k.cpa, h: x => eur(x.k.cpa) },
       { k: "roas", label: "ROAS", num: 1, v: x => x.k.roas, h: x => x2(x.k.roas) },
+      { k: "rent", label: "vs CPA máx.", v: x => rentab(x).o, h: x => { const r = rentab(x); return r.t ? `<span class="pill ${r.c}" title="${esc(r.tt)}">${r.t}</span>` : ""; } },
       { k: "ver", label: "Estado", v: x => x.k.veredicto, h: x => vpill(x.k.veredicto) },
       { k: "acc", label: "", h: x => `<button class="btn sm sec" data-edit-cr="${x.r.id}">Editar</button> <button class="btn sm danger" data-del-cr="${x.r.id}">Borrar</button>` }
     ], rows, "Añade creativos a mano o importa el CSV exportado del Administrador de anuncios");
@@ -353,7 +362,11 @@ views.meta = () => {
   }
   const sync = db.sistema.find(s => s.id === "metasync");
   const syncTxt = sync ? `<span class="pill brand">🤖 Agente Meta · última sincronización ${new Date(sync.fecha).toLocaleString("es-ES", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · ${sync.anuncios} anuncios</span>` : "";
-  return `<h1>Meta Ads · Creativos</h1><div class="sub">Cada vídeo o imagen lanzado, si ha funcionado o no, y qué ángulos merece la pena iterar. Métricas acumuladas de cada anuncio; ROAS corregido con compras reales de Shopify cuando las indicas.</div><div class="banner">${syncTxt}</div>${tabsHtml}${toolbar}${body}`;
+  const eco = C.productos.filter(p => p.cpaMax);
+  const ecoHtml = eco.length ? `<div class="card"><h3 style="margin:0 0 4px">💶 Límites de rentabilidad por producto</h3><p class="hint" style="margin:0 0 10px">Por pedido generado (lo que mide Meta). Con un píxel que capta el 60–80 % de las compras, el CPA que ves en Meta es más alto que el real: compáralo con las compras de Shopify.</p>
+    <div class="tbl-wrap"><table><thead><tr><th>Producto</th><th class="num">Ticket medio</th><th class="num">Confirmación</th><th class="num">Entrega</th><th class="num">CPA máx.</th><th class="num">ROAS breakeven</th><th class="num">CPA objetivo (20 %)</th><th class="num">ROAS objetivo</th><th class="num">CPA máx. por entregado</th></tr></thead><tbody>
+    ${eco.map(p => `<tr><td><b>${esc(p.nombre)}</b> <span class="hint">${String(p.uds).replace(".", ",")} uds · ${eur(p.costeUd)}/ud</span></td><td class="num">${eur(p.ticket)}</td><td class="num">${pct(p.conf)}</td><td class="num">${pct(p.entrega)}</td><td class="num"><b>${eur(p.cpaMax)}</b></td><td class="num"><b>${x2(p.roasBE)}</b></td><td class="num">${eur(p.cpaObj)}</td><td class="num">${x2(p.roasObj)}</td><td class="num">${eur(p.cpaMaxEnt)}</td></tr>`).join("")}</tbody></table></div></div>` : "";
+  return `<h1>Meta Ads · Creativos</h1><div class="sub">Cada vídeo o imagen lanzado, si ha funcionado o no, y qué ángulos merece la pena iterar. Métricas acumuladas de cada anuncio; ROAS corregido con compras reales de Shopify cuando las indicas.</div><div class="banner">${syncTxt}</div>${ecoHtml}${tabsHtml}${toolbar}${body}`;
 };
 views.meta.bind = () => {
   const f = ui.filters.meta;

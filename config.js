@@ -17,10 +17,14 @@ window.AURIALO_CONFIG = {
 
   equipo: ["Cristian", "Florencia", "Mayra"],
 
+  // Economía por producto (calculada el 26/11/2026 con los pedidos de Beeping del 27/10 al 16/11:
+  // ticket medio, unidades por pedido, coste unitario y costes logísticos del Sheet contable).
+  // cpaMax / roasBE: por pedido generado (lo que mide Meta). cpaObj / roasObj: dejando un 20 % de beneficio.
+  // cpaMaxEnt / roasBEEnt: por pedido entregado (como el CPA y ROAS del Informe Contable).
   productos: [
-    { code: "GLP1", nombre: "Parches GLP-1" },
-    { code: "MENO", nombre: "MENO" },
-    { code: "DRENAJE", nombre: "Drenaje Linfático" },
+    { code: "GLP1", nombre: "Parches GLP-1", ticket: 31.80, uds: 3.16, costeUd: 0.40, conf: 0.788, entrega: 0.827, cpaMax: 13.36, roasBE: 2.38, cpaObj: 9.22, roasObj: 3.45, cpaMaxEnt: 20.51, roasBEEnt: 1.55 },
+    { code: "MENO", nombre: "MENO", ticket: 33.38, uds: 2.34, costeUd: 1.79, conf: 0.802, entrega: 0.795, cpaMax: 11.96, roasBE: 2.79, cpaObj: 7.70, roasObj: 4.34, cpaMaxEnt: 18.76, roasBEEnt: 1.78 },
+    { code: "DRENAJE", nombre: "Drenaje Linfático", ticket: 32.68, uds: 1.19, costeUd: 2.14, conf: 0.714, entrega: 0.646, cpaMax: 7.98, roasBE: 4.09, cpaObj: 4.96, roasObj: 6.58, cpaMaxEnt: 17.29, roasBEEnt: 1.89 },
     { code: "MAGNESIO", nombre: "Magnesium Complex" },
     { code: "BOTOX", nombre: "Botox en Barra" },
     { code: "TIRAS", nombre: "Tiras Dentales" },
