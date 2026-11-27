@@ -1209,7 +1209,7 @@ function pedirPin() {
     if (EQ || !C.pinHash || localStorage.getItem("crm_pin") === C.pinHash) return res();
     const ov = document.createElement("div");
     ov.style.cssText = "position:fixed;inset:0;background:var(--side);z-index:100;display:flex;align-items:center;justify-content:center";
-    ov.innerHTML = `<form id="pin-form" class="card" style="width:320px;max-width:calc(100% - 32px);text-align:center" autocomplete="off" onsubmit="return false"><h2 style="margin-top:0">🔒 Aurialo CRM</h2><p class="hint">Introduce el PIN de acceso</p>
+    ov.innerHTML = `<form id="pin-form" class="card" style="width:320px;max-width:calc(100% - 32px);text-align:center" autocomplete="off" onsubmit="return false"><img src="icons/logo-azul.png" alt="Aurialo" style="width:170px;max-width:70%;margin:6px auto 4px;display:block"><h2 style="margin:6px 0 0;font-size:15px;color:var(--muted)">🔒 CRM</h2><p class="hint">Introduce el PIN de acceso</p>
       <input id="pin-in" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" autocorrect="off" autocapitalize="off" spellcheck="false" maxlength="8" style="width:100%;text-align:center;font-size:24px;letter-spacing:8px;-webkit-text-security:disc">
       <div id="pin-err" class="hint" style="color:var(--bad);min-height:18px;margin-top:6px"></div><button type="submit" class="btn" id="pin-ok" style="width:100%;padding:12px">Entrar</button>
       <p class="hint" style="margin-top:12px">¿Eres del equipo logístico? Entra en <a href="equipo.html">el panel del equipo</a></p></form>`;
@@ -1271,7 +1271,7 @@ $("#nav").innerHTML = NAV.map(([k, l]) => `<button data-view="${k}">${l}</button
   + (!EQ ? `<a href="equipo.html" target="_blank" rel="noopener" style="display:block;margin-top:12px;padding:10px 12px;border-radius:8px;color:var(--side-text);text-decoration:none;border:1px dashed #2c4475">👥 Ver panel del equipo ↗</a>
       <button id="lock-crm" title="Olvida el PIN en este navegador" style="margin-top:6px">🔒 Bloquear CRM</button>`
     : (C.pinHash && localStorage.getItem("crm_pin") === C.pinHash ? `<a href="index.html" style="display:block;margin-top:12px;padding:10px 12px;border-radius:8px;color:var(--side-text);text-decoration:none;border:1px dashed #2c4475">← Volver a mi CRM</a>` : ""));
-if (EQ) { ui.view = "mipanel"; document.title = "Aurialo · Equipo logístico"; document.querySelector(".brand").innerHTML = '<span class="dot"></span>Aurialo <b>Logística</b>'; }
+if (EQ) { ui.view = "mipanel"; document.title = "Aurialo · Equipo logístico"; document.querySelector(".brand").innerHTML = '<img src="icons/logo-blanco.png" alt="Aurialo" class="logo"><b>Logística</b>'; }
 /* móvil: botón de menú y app instalable */
 const sb = document.querySelector(".sidebar");
 const mb = document.createElement("button"); mb.className = "menu-btn"; mb.type = "button"; mb.innerHTML = "☰ Menú";
