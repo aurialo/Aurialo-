@@ -19,7 +19,7 @@ window.AURIALO_CONFIG = {
 
   // PIN del CRM completo (SHA-256). El panel del equipo (/equipo) no lo pide.
   // Para cambiarlo: pon aquí el SHA-256 del PIN nuevo (te lo calcula Claude).
-  pinHash: "9b18e9f2b8f335ddfe66ef2e2abeed87127225cbe555b91745c2b25ade970b6b",
+  pinHash: "0985b889a1fe4f4e1fb925061ac6fb2247f10875f5fcbe63eec2ab55ed68970e",
 
   // Objetivos del equipo logístico (panel /equipo)
   // conf: mínimo del objetivo de confirmación (78 %) · confTop: objetivo ideal (80 %) · confAviso: por debajo, en rojo
