@@ -275,6 +275,11 @@ function panelHoy() {
   const ag = db.sistema.find(x => x.id === "acciones");
   const agReciente = ag && Date.now() - new Date(ag.fecha).getTime() < 3.5 * 864e5;
   const A = agReciente ? { escalar: ag.escalar || [], apagar: ag.apagar || [], sano: ag.sano || [], vigilar: [...(ag.esperar || []), ...(ag.vigilar || [])], iterar: ag.iterar || [] } : { ...accionesCalculadas(), iterar: [] };
+  if (!EQ) {   // no escalar un producto que se va a quedar sin stock
+    const sinStock = new Set(stockAlertas().map(p => /glp/i.test(p.nombre) ? "GLP1" : /meno/i.test(p.nombre) ? "MENO" : /drenaje|linf/i.test(p.nombre) ? "DRENAJE" : p.code));
+    const bloq = A.escalar.filter(x => sinStock.has(x.producto));
+    if (bloq.length) { A.escalar = A.escalar.filter(x => !sinStock.has(x.producto)); A.vigilar = [...bloq.map(x => ({ ...x, motivo: "Rendiría para escalar, pero no hay stock suficiente: mantener presupuesto hasta reponer" })), ...A.vigilar]; }
+  }
   const fuente = agReciente ? `Según el agente <b>Analíticas Meta Ads</b> · ${new Date(ag.fecha).toLocaleString("es-ES", { weekday: "long", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}${ag.titular ? " · " + esc(ag.titular) : ""}${ag.totales ? " · " + esc(ag.totales) : ""}` : "Calculado con los anuncios activos en Meta y el CPA máximo de cada producto (datos acumulados de cada anuncio)";
   const dIso = k => new Date(Date.now() - k * 864e5).toISOString().slice(0, 10);
   const b7 = aggBeeping(beeping.rows.filter(r => r.fecha >= dIso(6)));
