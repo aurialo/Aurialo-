@@ -268,6 +268,7 @@ function render() {
   const app = $('#app');
   if (!DATA) {
     $('#syncInfo').textContent = 'Sin datos todavía';
+    if (EQM) { app.innerHTML = `<section><div class="panel"><h2 style="font-size:18px">Aún no hay incidencias cargadas</h2><p class="muted">Cristian las actualiza desde Beeping. En cuanto lo haga, aquí veréis vuestro rendimiento.</p></div></section>`; return; }
     app.innerHTML = `<section><div class="panel"><h2 style="font-size:18px">Carga las incidencias de Beeping</h2><p class="muted" style="max-width:62ch">Aquí verás cada incidencia con su estado de gestión, el tracking real de GLS y Correos Express, el dinero recuperado y el que está en juego. Pulsa <b>Actualizar desde Beeping</b> y crea el marcador: a partir de ahí, un clic en Beeping y las incidencias aparecen aquí para todo el equipo.</p><button class="primary" type="button" id="btnStart">Empezar</button></div></section>`;
     $('#btnStart').onclick = () => { $('#syncSec').hidden = false; };
     return;
@@ -465,9 +466,10 @@ $('#btnReload').onclick = () => load(false);
 $('#btnCopyBm').onclick = async () => { const t = $('#bmCode'); try { await navigator.clipboard.writeText(t.value); toast('Código del marcador copiado'); } catch (e) { t.focus(); t.select(); toast('Selecciónalo y cópialo con Ctrl+C / Cmd+C'); } };
 $('#btnImport').onclick = () => importText($('#pasteBox').value);
 $('#fileIn').onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => importText(r.result); r.readAsText(f); };
-document.addEventListener('paste', e => { const tgt = e.target; if (tgt && tgt.id === 'q') return; const txt = (e.clipboardData || window.clipboardData).getData('text'); if (txt && txt.indexOf('beeping-incidencias') > -1) { e.preventDefault(); importText(txt); } });
+document.addEventListener('paste', e => { if (EQM) return; const tgt = e.target; if (tgt && tgt.id === 'q') return; const txt = (e.clipboardData || window.clipboardData).getData('text'); if (txt && txt.indexOf('beeping-incidencias') > -1) { e.preventDefault(); importText(txt); } });
 const drop = $('#drop'); ['dragover', 'dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('on'); })); ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, () => drop.classList.remove('on')));
 drop.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) { const r = new FileReader(); r.onload = () => importText(r.result); r.readAsText(f); } });
+if (EQM) { $('#btnSync').remove(); $('#syncSec').remove(); }
 load(false);
 setInterval(() => { if (!document.hidden) load(true); }, 60000);
 })();

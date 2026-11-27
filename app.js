@@ -646,7 +646,7 @@ const F_TAR = [
   { k: "notas", label: "Notas", type: "textarea", full: 1 }];
 views.logistica = () => {
   const nPend = db.notas.filter(x => x.tipo === "Duda para Cristian" && !x.respuesta).length;
-  const [tab, tabsHtml] = tabs("logistica", [["res", "Resultados (Beeping)"], ["mot", "Motivos de rechazo"], ["conf", "Confirmaciones WhatsApp"], ["inc", "Incidencias"], ["tar", "Tareas"], ["notas", `📝 Notas del equipo${nPend ? ` (${nPend})` : ""}`]]);
+  const [tab, tabsHtml] = tabs("logistica", [["res", "Resultados (Beeping)"], ["mot", "Motivos de rechazo"], ...(EQ ? [] : [["conf", "Confirmaciones WhatsApp"]]), ["inc", "Incidencias"], ["tar", "Tareas"], ["notas", `📝 Notas del equipo${nPend ? ` (${nPend})` : ""}`]].filter(Boolean));
   let body = "";
   if (tab === "notas") body = notasView();
   else if (tab === "mot") {
@@ -729,7 +729,8 @@ views.logistica = () => {
         [...db.confirmaciones].sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")), "Cada persona apunta al final del día cuántos pedidos confirmó, canceló o no contestaron");
   } else if (tab === "inc") {
     const f = ui.filters.inc || (ui.filters.inc = { est: "abiertas", modo: "beeping" });
-    const sw = `<div class="tabs" style="border:0;margin-bottom:10px">${[["beeping", "📦 Beeping (automático)"], ["manual", "✍️ Registro manual"]].map(([k, l]) => `<button data-incmodo="${k}" class="${(f.modo || "beeping") === k ? "active" : ""}">${l}</button>`).join("")}</div>`;
+    if (EQ) f.modo = "beeping";
+    const sw = EQ ? "" : `<div class="tabs" style="border:0;margin-bottom:10px">${[["beeping", "📦 Beeping (automático)"], ["manual", "✍️ Registro manual"]].map(([k, l]) => `<button data-incmodo="${k}" class="${(f.modo || "beeping") === k ? "active" : ""}">${l}</button>`).join("")}</div>`;
     if ((f.modo || "beeping") === "beeping") {
       body = sw + `<iframe id="inc-frame" src="incidencias.html${EQ ? "?modo=equipo" : ""}" title="Incidencias de Beeping" style="width:100%;border:0;min-height:700px;display:block"></iframe>`;
     } else {
@@ -748,13 +749,13 @@ views.logistica = () => {
     }
   } else {
     const order = { Alta: 0, Media: 1, Baja: 2 };
-    body = `<div class="toolbar"><span class="grow"></span><button class="btn" id="new-tar">+ Tarea</button></div>
+    body = `${EQ ? "" : `<div class="toolbar"><span class="grow"></span><button class="btn" id="new-tar">+ Tarea</button></div>`}
     <div class="kanban" style="grid-template-columns:repeat(3,minmax(220px,1fr))">${["Pendiente", "En curso", "Hecha"].map((e, i) => { const l = db.tareas.filter(t => (t.estado || "Pendiente") === e).sort((a, b) => order[a.prioridad] - order[b.prioridad]);
       return `<div class="col"><h4>${e}<span>${l.length}</span></h4>${l.map(t => `<div class="kc"><div class="t">${esc(t.titulo)}</div>
         <div class="m"><span class="pill ${{ Alta: "bad", Media: "warn", Baja: "info" }[t.prioridad] || ""}">${esc(t.prioridad || "")}</span> ${esc(t.responsable || "")}${t.fecha ? " · " + fdate(t.fecha) : ""}</div>
         ${t.notas ? `<div>${esc(t.notas.slice(0, 100))}</div>` : ""}
-        <div class="a">${i > 0 ? `<button class="btn sm sec" data-tmv="${t.id}" data-d="-1">←</button>` : ""}${i < 2 ? `<button class="btn sm sec" data-tmv="${t.id}" data-d="1">→</button>` : ""}
-        <button class="btn sm sec" data-edit="tareas:${t.id}">Editar</button><button class="btn sm danger" data-del="tareas:${t.id}">✕</button></div></div>`).join("")}</div>`; }).join("")}</div>`;
+        ${EQ ? "" : `<div class="a">${i > 0 ? `<button class="btn sm sec" data-tmv="${t.id}" data-d="-1">←</button>` : ""}${i < 2 ? `<button class="btn sm sec" data-tmv="${t.id}" data-d="1">→</button>` : ""}
+        <button class="btn sm sec" data-edit="tareas:${t.id}">Editar</button><button class="btn sm danger" data-del="tareas:${t.id}">✕</button></div>`}</div>`).join("")}</div>`; }).join("")}</div>`;
   }
   return `<h1>Equipo logístico</h1><div class="sub">Confirmaciones COD por WhatsApp, incidencias de envío y tareas del equipo (${C.equipo.slice(1).join(" y ")}).</div>${tabsHtml}${body}`;
 };
@@ -961,7 +962,6 @@ views.mipanel = () => {
     ${kpi("% Devoluciones · 4 semanas", `<span class="pill ${devol == null ? "" : devol <= OBJ.devol ? "ok" : "bad"}" style="font-size:20px">${pct(devol)}</span>`, `${bd.devueltos} de ${bd.confirmados} confirmados · máximo ${pct(OBJ.devol)}`)}
     ${kpi("Incidencias sin gestionar", inc ? `<span style="color:var(--${inc.sinGestionar ? "bad" : "ok"})">${inc.sinGestionar}</span>` : "—", inc ? `${inc.zombies || 0} abiertas con envío cerrado · ${inc.total} en total` : "Sincroniza Beeping en Incidencias")}
     ${kpi("Tus tareas pendientes", misTar.length, vencidas.length ? `<span style="color:var(--bad)">${vencidas.length} vencidas</span>` : "Al día")}
-    ${kpi("Tu registro diario", `${regs.length} de 7 días`, "Confirmaciones apuntadas en el CRM")}
   </div>
   <h2>📈 Evolución por semanas</h2>${table("sem", [
     { k: "desde", label: "Semana", h: w => `${fdate(w.desde)} – ${fdate(w.hasta)}${w.enCurso ? ` <span class="hint">en curso</span>` : ""}` },
