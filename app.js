@@ -669,13 +669,40 @@ views.cerebro.bind = () => {
   const s = $("#cer-prod"); if (s) s.onchange = e => { ui.filters.cerebro = { prod: e.target.value }; render(); };
 };
 
+/* frescura de cada fuente de datos */
+function fuentesDatos() {
+  const S = id => db.sistema.find(x => x.id === id);
+  const h = f => f ? (Date.now() - new Date(f).getTime()) / 36e5 : null;
+  const L = [
+    ["Shopify", S("shopify") && S("shopify").fecha, 2.5, "cada hora (8–23 h)"],
+    ["Beeping (Sheet)", beeping.fecha, 1.5, beeping.fuente && /directo/.test(beeping.fuente) ? "en directo" : "cada hora"],
+    ["Meta Ads", S("metasync") && S("metasync").fecha, 84, "lun, mié y vie 8:03"],
+    ["Stock", S("stock") && S("stock").fecha, 26, "cada día 8:13"],
+    ["Incidencias", S("inc_resumen") && (S("inc_resumen").datosDe || S("inc_resumen").fecha), 26, "cuando sincronizas Beeping"],
+    ["Motivos", S("motivos") && S("motivos").fecha, 26, "cada día 7:52"],
+    ["Competencia", S("competencia") && S("competencia").fecha, 8 * 24, "lunes 8:06"],
+  ];
+  if (EQ) return L.filter(x => ["Shopify", "Beeping (Sheet)", "Incidencias", "Motivos"].includes(x[0]));
+  return [...L, ["Nómina", S("nomina") && S("nomina").fecha, 26, "cada día 7:47"]];
+}
+function fuentesHtml() {
+  const txt = x => x == null ? "sin datos" : x < 1 ? `hace ${Math.max(1, Math.round(x * 60))} min` : x < 48 ? `hace ${Math.round(x)} h` : `hace ${Math.round(x / 24)} d`;
+  return `<div class="fuentes">${fuentesDatos().map(([n, f, lim, cuando]) => { const x = f ? (Date.now() - new Date(f).getTime()) / 36e5 : null; const st = x == null ? "line" : x > lim ? "warn" : "ok";
+    return `<span class="fchip" title="Se actualiza: ${cuando}"><i style="background:var(--${st})"></i>${n} · ${txt(x)}</span>`; }).join("")}</div>`;
+}
+async function refrescarTodo(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Actualizando…"; }
+  await load(); beeping.fecha = null; await loadBeeping(); render();
+  const viejas = fuentesDatos().filter(([, f, lim]) => !f || (Date.now() - new Date(f).getTime()) / 36e5 > lim).map(x => x[0]);
+  toast(viejas.length ? `🔄 Actualizado. Con retraso: ${viejas.join(", ")} (se actualizan con su agente)` : "🔄 Todo actualizado");
+}
 views.panel = () => {
   const [tab, tabsHtml] = tabs("panel", [["hoy", "📌 Hoy"], ["kpis", "📊 KPIs"]]);
-  return tabsHtml + (tab === "hoy" ? panelHoy() : panelKpis());
+  return `<div class="refresh-bar"><button class="btn sm sec" id="refresh-all">🔄 Actualizar datos</button>${fuentesHtml()}</div>` + tabsHtml + (tab === "hoy" ? panelHoy() : panelKpis());
 };
 views.panel.bind = () => {
-  const g = document.querySelector("[data-goinc]");
-  if (g) g.onclick = e => { e.preventDefault(); ui.view = "logistica"; ui.tabs.logistica = "inc"; location.hash = "logistica"; render(); };
+  document.querySelectorAll("[data-goinc]").forEach(g => g.onclick = e => { e.preventDefault(); ui.view = "logistica"; ui.tabs.logistica = "inc"; location.hash = "logistica"; render(); });
+  const r = $("#refresh-all"); if (r) r.onclick = () => refrescarTodo(r);
 };
 
 /* ----- Meta Ads ----- */
