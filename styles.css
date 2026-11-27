@@ -128,3 +128,12 @@ code{background:#eef2f8;padding:1px 5px;border-radius:4px}
   .banner .pill{font-size:12px}
   #inc-frame{min-height:900px !important}
 }
+
+/* panel Hoy */
+.tile{transition:transform .12s, box-shadow .12s}
+.tile:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(15,33,72,.08)}
+details.psec>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px}
+details.psec>summary::-webkit-details-marker{display:none}
+details.psec>summary::after{content:"▾";margin-left:auto;color:var(--muted);transition:transform .15s}
+details.psec:not([open])>summary::after{transform:rotate(-90deg)}
+@media(max-width:760px){.tile div[style*="font-size:21px"]{font-size:18px !important}}
