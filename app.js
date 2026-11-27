@@ -451,7 +451,7 @@ views.gastos = () => {
       <div style="flex:1"><b style="color:var(--strong)">${esc(x.g.concepto)}</b> <span class="hint">· ${esc(x.g.categoria || "")} · ${esc(x.g.frecuencia || "")}${x.g.metodo ? " · " + esc(x.g.metodo) : ""}</span><div class="hint">${cuando(x.d)}</div></div>
       <div style="font-weight:700;color:var(--strong);min-width:90px;text-align:right">${eur(n(x.g.importe))}</div>
       ${x.f === x.g.fecha && x.d <= 7 ? `<button class="btn sm sec" data-gpay="${x.g.id}" data-gf="${x.f}">✔ Pagado</button>` : `<span style="width:86px"></span>`}</div>`;
-  const semanas = [0, 1, 2, 3].map(k => { const ini = k * 7, fin = ini + 6; const l = p30.filter(x => x.d >= ini && x.d <= fin);
+  const semanas = [0, 1, 2, 3].map(k => { const ini = k * 7, fin = ini + 6; const l = p30.filter(x => (k === 0 || x.d >= ini) && x.d <= fin);
     return [k === 0 ? "Esta semana" : `Semana ${k + 1}`, tot(l), l.length]; });
   const maxS = Math.max(1, ...semanas.map(s => s[1]));
   const lista = [...db.gastos].sort((a, b) => (a.activo === "No") - (b.activo === "No") || (a.fecha || "9").localeCompare(b.fecha || "9"));
