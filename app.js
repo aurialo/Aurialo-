@@ -325,7 +325,7 @@ function panelHoy() {
     T("✅", "Confirmación 7 d", pct(b7.pConf), `objetivo ${Math.round(OBJ.conf * 100)}–${Math.round(OBJ.confTop * 100)} %`, semaf(b7.pConf, OBJ.conf, OBJ.confAviso) || "line", "#logistica"),
     T("📦", "Entrega sem. cerrada", pct(bc.pEnt), `objetivo ${Math.round(OBJ.entrega * 100)} %`, semaf(bc.pEnt, OBJ.entrega, .7) || "line", "#logistica"),
     T("💰", "Beneficio sem. cerrada", eur(bc.beneficio), `${pct(bc.pBen)} sobre lo entregado`, bc.beneficio > 0 ? (bc.pBen >= .15 ? "ok" : "warn") : "bad", "#logistica"),
-    T("📈", "Meta Ads", `${A.escalar.length} ↑ · ${A.apagar.length} ⛔`, agReciente ? `escalar · parar${finde ? " (el lunes)" : ""}` : "sin informe reciente", A.apagar.length ? "bad" : A.escalar.length ? "ok" : agReciente ? "info" : "line", "#panel-meta", 'data-scroll="meta"'),
+    T("📈", "Meta Ads", `${A.escalar.length} ↑ · ${A.apagar.length} ⛔`, `escalar · parar${finde ? " (el lunes)" : ""}${agReciente ? "" : " · calculado"}`, A.apagar.length ? "bad" : A.escalar.length ? "ok" : agReciente ? "info" : "line", "#panel-meta", 'data-scroll="meta"'),
   ];
   if (!EQ) tiles.push(
     T("🧠", "Cerebro Meta", `${pp.length}`, pp.length ? `por aprobar${ppAlta.length ? ` · ${ppAlta.length} alta` : ""}` : "todo revisado", ppAlta.length ? "warn" : pp.length ? "info" : "ok", "#cerebro"),
@@ -376,7 +376,7 @@ function panelHoy() {
     ${incMan.length ? `<li>${incMan.length} incidencias del registro manual abiertas</li>` : ""}${inc && inc.zombies ? `<li>${inc.zombies} incidencias abiertas en Beeping con el envío ya cerrado: cerrarlas</li>` : ""}
     ${!agReciente ? `<li class="hint">El agente Analíticas Meta Ads aún no ha dejado recomendaciones (lunes, miércoles y viernes 8:03)</li>` : ""}</ul>` : "";
   return `<h1>Hoy · ${esc(dia)}</h1><div class="sub">Cada recuadro es un área: 🟢 bien · 🟠 atención · 🔴 actuar. Púlsalo para ir al detalle.</div>
-  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:10px;margin-bottom:14px">${tiles.join("")}</div>
+  <div class="tiles">${tiles.join("")}</div>
   <div class="card" style="border-left:5px solid var(--${urg.some(u => u[0] === "bad") ? "bad" : urg.length ? "warn" : "ok"})"><h3 style="margin:0 0 6px">🔥 Para hoy ${urg.length ? `<span class="hint">${urg.length}</span>` : ""}</h3>
     ${urg.length ? `<div>${urg.map(([c, t, h]) => `<a href="${h}" ${h.startsWith("#panel-") ? `data-scroll="${h.slice(7)}"` : ""} style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);color:inherit;text-decoration:none"><span style="width:9px;height:9px;border-radius:50%;background:var(--${c});flex:0 0 auto"></span><span style="flex:1">${t}</span><span class="hint">›</span></a>`).join("")}</div>` : `<div class="hint">Nada urgente hoy 🎉</div>`}</div>
   ${sec("meta", `📈 Meta Ads · ${A.escalar.length} escalar · ${A.apagar.length} parar · ${A.vigilar.length} vigilar`, metaHtml, A.escalar.length + A.apagar.length > 0)}
