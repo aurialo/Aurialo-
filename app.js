@@ -1169,6 +1169,7 @@ function banner() {
 function render() {
   banner();
   document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("active", b.dataset.view === ui.view));
+  const mbtn = document.querySelector(".menu-btn"); if (mbtn) { const k = feedbackPend().length, cur = NAV.find(([v]) => v === ui.view); mbtn.innerHTML = `☰ ${cur ? cur[1] : "Menú"}${k ? ` <span class="badge">${k}</span>` : ""}`; }
   const pb = document.querySelector('#nav button[data-view="panel"]'); if (pb) { const k = feedbackPend().length; pb.innerHTML = `📊 Panel${k ? ` <span style="background:#e11d48;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;margin-left:4px" title="Feedback del equipo sin recoger">${k}</span>` : ""}`; }
   $("#view").innerHTML = views[ui.view]();
   views[ui.view].bind && views[ui.view].bind();
@@ -1180,7 +1181,14 @@ $("#nav").innerHTML = NAV.map(([k, l]) => `<button data-view="${k}">${l}</button
       <button id="lock-crm" title="Olvida el PIN en este navegador" style="margin-top:6px">🔒 Bloquear CRM</button>`
     : (C.pinHash && localStorage.getItem("crm_pin") === C.pinHash ? `<a href="index.html" style="display:block;margin-top:12px;padding:10px 12px;border-radius:8px;color:var(--side-text);text-decoration:none;border:1px dashed #2c4475">← Volver a mi CRM</a>` : ""));
 if (EQ) { ui.view = "mipanel"; document.title = "Aurialo · Equipo logístico"; document.querySelector(".brand").innerHTML = '<span class="dot"></span>Aurialo <b>Logística</b>'; }
-$("#nav").onclick = e => { const b = e.target.closest("button"); if (b && b.id === "lock-crm") { localStorage.removeItem("crm_pin"); location.reload(); return; } if (b) { ui.view = b.dataset.view; location.hash = ui.view; render(); } };
+/* móvil: botón de menú y app instalable */
+const sb = document.querySelector(".sidebar");
+const mb = document.createElement("button"); mb.className = "menu-btn"; mb.type = "button"; mb.innerHTML = "☰ Menú";
+sb.insertBefore(mb, sb.querySelector("#nav"));
+mb.onclick = () => sb.classList.toggle("open");
+document.addEventListener("click", e => { if (sb.classList.contains("open") && !sb.contains(e.target)) sb.classList.remove("open"); });
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+$("#nav").onclick = e => { if (e.target.closest("#nav button")) { sb.classList.remove("open"); window.scrollTo(0, 0); } const b = e.target.closest("button"); if (b && b.id === "lock-crm") { localStorage.removeItem("crm_pin"); location.reload(); return; } if (b) { ui.view = b.dataset.view; location.hash = ui.view; render(); } };
 if (EQ && !localStorage.getItem("crm_yo")) localStorage.setItem("crm_yo", C.equipo.find(p => p !== "Cristian") || C.equipo[0]);
 $("#yo").innerHTML = C.equipo.map(p => `<option ${p === me() ? "selected" : ""}>${p}</option>`).join("");
 window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (views[h] && NAV.some(([k]) => k === h) && h !== ui.view) { ui.view = h; render(); } });
