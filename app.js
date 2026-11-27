@@ -4,7 +4,9 @@
 (() => {
 const C = window.AURIALO_CONFIG;
 const COLS = ["creativos", "produccion", "confirmaciones", "incidencias", "tareas", "competidores", "anuncios", "sistema", "notas"];
-const EQ = window.CRM_MODO === "equipo";   // panel del equipo logístico: solo logística y sin datos de dinero
+const EQ = window.CRM_MODO === "equipo";
+const OBJ = Object.assign({ conf: 0.78, confTop: 0.80, confAviso: 0.70, entrega: 0.85, devol: 0.15, sinMotivo: 0.3 }, C.objetivos || {});
+const objConf = () => `${Math.round(OBJ.conf * 100)}–${Math.round(OBJ.confTop * 100)} %`;   // panel del equipo logístico: solo logística y sin datos de dinero
 const db = Object.fromEntries(COLS.map(c => [c, []]));
 let online = false;
 const ui = { view: "panel", tabs: {}, sort: {}, filters: {} };
@@ -306,7 +308,7 @@ function panelHoy() {
   <div class="card"><h3 style="margin:0 0 10px">🏪 Resumen de la tienda</h3><div class="grid">
     ${kpi(`Pedidos hoy · Shopify`, sHoy ? `${sHoy.pedidos} pedidos` : "—", sHoy ? `${eur(sHoy.ventas)} · ${mix(sHoy)}${sh.ultimoPedido ? ` · último ${esc(sh.ultimoPedido.name)} a las ${new Date(sh.ultimoPedido.createdAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" })}` : ""}` : "Sin datos de hoy todavía")}
     ${kpi("Ayer · Shopify", sAyer ? `${sAyer.pedidos} pedidos` : "—", sAyer ? `${eur(sAyer.ventas)} · ${mix(sAyer)}${sAyer.manuales ? ` · ${sAyer.manuales} manuales` : ""}${media ? ` · media 7 días ${String(media.toFixed(1)).replace(".", ",")}` : ""}` : "")}
-    ${kpi("% Confirmación · 7 días", `<span class="pill ${semaf(b7.pConf, .75, .6)}" style="font-size:20px">${pct(b7.pConf)}</span>`, `${b7.confirmados} de ${b7.generados} pedidos`)}
+    ${kpi("% Confirmación · 7 días", `<span class="pill ${semaf(b7.pConf, OBJ.conf, OBJ.confAviso)}" style="font-size:20px">${pct(b7.pConf)}</span>`, `${b7.confirmados} de ${b7.generados} pedidos`)}
     ${kpi("% Entrega · semana cerrada", `<span class="pill ${semaf(bc.pEnt, .85, .7)}" style="font-size:20px">${pct(bc.pEnt)}</span>`, `${fdate(dIso(13))}–${fdate(dIso(7))}`)}
     ${kpi("Beneficio · semana cerrada", `<span style="color:var(--${bc.beneficio >= 0 ? "ok" : "bad"})">${eur(bc.beneficio)}</span>`, `${pct(bc.pBen)} sobre lo entregado`)}
   </div>
@@ -363,7 +365,7 @@ function panelKpis() {
   const malos = cr.filter(x => x.k.veredicto === "No relanzar").sort((a, b) => b.k.gasto - a.k.gasto).slice(0, 8);
   return `<h1>KPIs</h1><div class="sub">Todos los indicadores de la tienda, Meta Ads y el equipo.</div>
   ${beeping.rows.length ? `<h2 style="margin-top:0">📦 Tienda (Beeping)</h2><div class="grid" style="margin-bottom:14px">
-    ${kpi("% Confirmación · 7 días", `<span class="pill ${semaf(b7.pConf, .75, .6)}" style="font-size:20px">${pct(b7.pConf)}</span>`, `${b7.confirmados} de ${b7.generados} pedidos`)}
+    ${kpi("% Confirmación · 7 días", `<span class="pill ${semaf(b7.pConf, OBJ.conf, OBJ.confAviso)}" style="font-size:20px">${pct(b7.pConf)}</span>`, `${b7.confirmados} de ${b7.generados} pedidos`)}
     ${kpi("% Entrega · semana cerrada", `<span class="pill ${semaf(bc.pEnt, .85, .7)}" style="font-size:20px">${pct(bc.pEnt)}</span>`, `${bc.entregados} de ${bc.confirmados} · ${bcTxt}`)}
     ${kpi("Beneficio · semana cerrada", `<span style="color:var(--${bc.beneficio >= 0 ? "ok" : "bad"})">${eur(bc.beneficio)}</span>`, `Ingresos ${eur(bc.ingresos)} · ${bcTxt}`)}
     ${kpi("% Beneficio · semana cerrada", pct(bc.pBen), "Sobre lo entregado")}
@@ -689,7 +691,7 @@ views.logistica = () => {
       <span class="grow"></span><button class="btn sec" id="fb-reload">🔄 Actualizar</button></div>
     ${beeping.error ? `<div class="card hint">⚠️ ${esc(beeping.error)}</div>` : ""}
     <div class="grid">
-      ${big("% Confirmación", pct(t.pConf), semaf(t.pConf, .75, .6), `${t.confirmados} confirmados de ${t.generados} generados`)}
+      ${big("% Confirmación", pct(t.pConf), semaf(t.pConf, OBJ.conf, OBJ.confAviso), `${t.confirmados} confirmados de ${t.generados} generados`)}
       ${big("% Entrega", pct(t.pEnt), semaf(t.pEnt, .85, .7), `${t.entregados} entregados · ${t.devueltos} devueltos`)}
       ${EQ ? big("% Devoluciones", pct(t.confirmados ? t.devueltos / t.confirmados : null), t.confirmados && t.devueltos / t.confirmados > .15 ? "bad" : "ok", "Sobre los confirmados") + kpi("Pedidos generados", t.generados, `${t.confirmados} confirmados · ${t.entregados} entregados`)
         : big("Beneficio (resultado)", eur(t.beneficio), t.beneficio > 0 ? "ok" : "bad", `Ingresos entregados ${eur(t.ingresos)}`) + big("% Beneficio", pct(t.pBen), semaf(t.pBen, .2, .05), "Sobre el importe entregado")}
@@ -703,7 +705,7 @@ views.logistica = () => {
     table("bee", [
       { k: "fecha", label: "Fecha", h: r => fdate(r.fecha) + (r.fecha >= hace7 ? ` <span class="hint">en curso</span>` : "") },
       { k: "generados", label: "Generados", num: 1 }, { k: "confirmados", label: "Confirm.", num: 1 },
-      { k: "pConf", label: "% Conf.", num: 1, v: r => r.generados ? r.confirmados / r.generados : null, h: r => { const v = r.generados ? r.confirmados / r.generados : null; return `<span class="pill ${semaf(v, .75, .6)}">${pct(v)}</span>`; } },
+      { k: "pConf", label: "% Conf.", num: 1, v: r => r.generados ? r.confirmados / r.generados : null, h: r => { const v = r.generados ? r.confirmados / r.generados : null; return `<span class="pill ${semaf(v, OBJ.conf, OBJ.confAviso)}">${pct(v)}</span>`; } },
       { k: "entregados", label: "Entreg.", num: 1 },
       { k: "pEnt", label: "% Entrega", num: 1, v: r => r.confirmados ? r.entregados / r.confirmados : null, h: r => { const v = r.confirmados ? r.entregados / r.confirmados : null; return `<span class="pill ${semaf(v, .85, .7)}">${pct(v)}</span>`; } },
       { k: "devueltos", label: "Devuel.", num: 1 },
@@ -911,7 +913,6 @@ document.addEventListener("change", e => {
 });
 
 /* ----- Mi panel (equipo logístico) ----- */
-const OBJ = C.objetivos || { conf: 0.75, entrega: 0.85, devol: 0.15, sinMotivo: 0.3 };
 function semanas(n) {
   const out = [], lunes = d => { const x = new Date(d); const w = (x.getDay() + 6) % 7; x.setDate(x.getDate() - w); return x; };
   let ini = lunes(new Date());
@@ -941,7 +942,9 @@ views.mipanel = () => {
   const misDudas = db.notas.filter(x => x.autor === yo && x.respuesta && x.respondidoEn && Date.now() - new Date(x.respondidoEn).getTime() < 7 * 864e5);
   const flecha = (a, b) => a == null || b == null ? "" : a > b + .01 ? ` <span style="color:var(--ok)">▲ ${Math.round((a - b) * 100)} pts</span>` : a < b - .01 ? ` <span style="color:var(--bad)">▼ ${Math.round((b - a) * 100)} pts</span>` : ` <span class="hint">= igual</span>`;
   const msgs = [];
-  if (b7.pConf != null) msgs.push(b7.pConf >= OBJ.conf ? ["ok", `Confirmación de los últimos 7 días: <b>${pct(b7.pConf)}</b>, por encima del objetivo (${pct(OBJ.conf)}). ¡Muy bien!`] : ["warn", `Confirmación de los últimos 7 días: <b>${pct(b7.pConf)}</b>, por debajo del objetivo (${pct(OBJ.conf)}). Insistid con una segunda llamada o WhatsApp a quien no contesta.`]);
+  if (b7.pConf != null) msgs.push(b7.pConf >= OBJ.confTop ? ["ok", `Confirmación de los últimos 7 días: <b>${pct(b7.pConf)}</b>, objetivo cumplido (${objConf()}). ¡Muy bien!`]
+    : b7.pConf >= OBJ.conf ? ["ok", `Confirmación de los últimos 7 días: <b>${pct(b7.pConf)}</b>, dentro del objetivo (${objConf()}). A por el ${Math.round(OBJ.confTop * 100)} %.`]
+    : ["warn", `Confirmación de los últimos 7 días: <b>${pct(b7.pConf)}</b>, por debajo del objetivo (${objConf()}). Faltan ${Math.round((OBJ.conf - b7.pConf) * 100)} puntos: insistid con una segunda llamada o WhatsApp a quien no contesta.`]);
   if (bc.pEnt != null) msgs.push(bc.pEnt >= OBJ.entrega ? ["ok", `Entrega de la semana cerrada: <b>${pct(bc.pEnt)}</b>, objetivo cumplido.`] : ["warn", `Entrega de la semana cerrada: <b>${pct(bc.pEnt)}</b> (objetivo ${pct(OBJ.entrega)}). Revisad las incidencias antes de que Beeping las devuelva.`]);
   if (inc) msgs.push(inc.sinGestionar ? ["bad", `Hay <b>${inc.sinGestionar} incidencias de Beeping sin gestionar</b>${inc.masAntigua ? `; la más antigua lleva ${inc.masAntigua} días` : ""}. Es lo primero de hoy.`] : ["ok", "Ninguna incidencia de Beeping sin gestionar. ¡Perfecto!"]);
   if (sinMot != null && sinMot > OBJ.sinMotivo) msgs.push(["warn", `En el <b>${pct(sinMot)}</b> de las cancelaciones no consta el motivo real. Preguntad siempre «¿por qué ha cambiado de idea?» y anotadlo en la hoja.`]);
@@ -953,7 +956,7 @@ views.mipanel = () => {
   <div class="card"><h3 style="margin:0 0 6px">📣 Cómo vamos</h3>${msgs.map(([c, t]) => `<div style="display:flex;gap:8px;align-items:flex-start;margin:6px 0"><span class="pill ${c}" style="min-width:12px">&nbsp;</span><span>${t}</span></div>`).join("") || `<span class="hint">Sin datos todavía</span>`}</div>
   <div class="grid">
     ${kpi("Pedidos hoy", sHoy ? sHoy.pedidos : "—", sh ? `Shopify · actualizado ${new Date(sh.fecha).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}` : "")}
-    ${kpi("% Confirmación · 7 días", `<span class="pill ${semaf(b7.pConf, OBJ.conf, .6)}" style="font-size:20px">${pct(b7.pConf)}</span>`, `${b7.confirmados} de ${b7.generados} · objetivo ${pct(OBJ.conf)}`)}
+    ${kpi("% Confirmación · 7 días", `<span class="pill ${semaf(b7.pConf, OBJ.conf, OBJ.confAviso)}" style="font-size:20px">${pct(b7.pConf)}</span>`, `${b7.confirmados} de ${b7.generados} · objetivo ${objConf()}`)}
     ${kpi("% Entrega · semana cerrada", `<span class="pill ${semaf(bc.pEnt, OBJ.entrega, .7)}" style="font-size:20px">${pct(bc.pEnt)}</span>`, `${bc.entregados} de ${bc.confirmados}${flecha(bc.pEnt, bp.pEnt)} vs semana anterior`)}
     ${kpi("% Devoluciones · 4 semanas", `<span class="pill ${devol == null ? "" : devol <= OBJ.devol ? "ok" : "bad"}" style="font-size:20px">${pct(devol)}</span>`, `${bd.devueltos} de ${bd.confirmados} confirmados · máximo ${pct(OBJ.devol)}`)}
     ${kpi("Incidencias sin gestionar", inc ? `<span style="color:var(--${inc.sinGestionar ? "bad" : "ok"})">${inc.sinGestionar}</span>` : "—", inc ? `${inc.zombies || 0} abiertas con envío cerrado · ${inc.total} en total` : "Sincroniza Beeping en Incidencias")}
@@ -963,7 +966,7 @@ views.mipanel = () => {
   <h2>📈 Evolución por semanas</h2>${table("sem", [
     { k: "desde", label: "Semana", h: w => `${fdate(w.desde)} – ${fdate(w.hasta)}${w.enCurso ? ` <span class="hint">en curso</span>` : ""}` },
     { k: "gen", label: "Pedidos", num: 1, h: w => w.t.generados }, { k: "conf", label: "Confirmados", num: 1, h: w => w.t.confirmados },
-    { k: "pConf", label: "% Confirmación", num: 1, h: w => `<span class="pill ${semaf(w.t.pConf, OBJ.conf, .6)}">${pct(w.t.pConf)}</span>` },
+    { k: "pConf", label: "% Confirmación", num: 1, h: w => `<span class="pill ${semaf(w.t.pConf, OBJ.conf, OBJ.confAviso)}">${pct(w.t.pConf)}</span>` },
     { k: "ent", label: "Entregados", num: 1, h: w => w.t.entregados },
     { k: "pEnt", label: "% Entrega", num: 1, h: w => `<span class="pill ${semaf(w.t.pEnt, OBJ.entrega, .7)}">${pct(w.t.pEnt)}</span>` },
     { k: "dev", label: "Devueltos", num: 1, h: w => w.t.devueltos }], sem.filter(w => w.t.generados))}
