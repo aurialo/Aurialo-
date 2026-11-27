@@ -94,9 +94,10 @@ const beeping = { rows: [], fuente: "", fecha: null, error: "" };
 const bnum = s => { s = String(s ?? "").trim(); if (!s || s === "-") return 0; const neg = /^\(.*\)/.test(s) || s.startsWith("-"); s = s.replace(/[()€%\s-]/g, "").replace(/\./g, "").replace(",", "."); const v = n(s); return neg ? -v : v; };
 function parseBeeping(text) {
   const rows = parseCSV(text);
-  const hi = rows.findIndex(r => r.some(c => norm(c) === "fecha") && r.some(c => norm(c) === "generados"));
+  const nn = c => norm(String(c || "")).replace(/\s+/g, " ");
+  const hi = rows.findIndex(r => r.some(c => nn(c).endsWith("fecha")) && r.some(c => nn(c).endsWith("generados")));
   if (hi < 0) return [];
-  const h = rows[hi].map(norm), col = name => h.findIndex(x => x.startsWith(norm(name)));
+  const h = rows[hi].map(nn), col = name => { const k = norm(name); return name === "fecha" ? h.findIndex(x => x.endsWith("fecha")) : h.findIndex(x => x === k || x.endsWith(" " + k) || x.startsWith(k)); };
   const I = { fecha: col("fecha"), inversion: col("inversion publicitaria"), ventas: col("importe total"), generados: col("generados"), confirmados: col("confirmados"),
     entregados: col("entregados"), devueltos: col("devueltos"), ingresos: col("importe entregado"), costeProducto: col("coste total de producto"),
     envio: col("coste por envio"), picking: col("coste por picking"), cod: col("coste por cod"), financiero: col("coste financiero"), costes: col("total costes") };
@@ -109,17 +110,20 @@ function parseBeeping(text) {
   });
   return out;
 }
+const sheetId = () => { try { return EQ ? "" : (localStorage.getItem("sheet_contable") || ""); } catch (e) { return ""; } };
+const beepingUrl = () => C.beepingCsvUrl || (sheetId() ? `https://docs.google.com/spreadsheets/d/${sheetId()}/gviz/tq?tqx=out:csv&sheet=Registro-Base` : "");
 async function loadBeeping() {
   beeping.error = "";
-  if (C.beepingCsvUrl) {
+  const BU = beepingUrl();
+  if (BU) {
     try {
-      const r = await fetch(C.beepingCsvUrl + (C.beepingCsvUrl.includes("?") ? "&" : "?") + "t=" + Date.now());
+      const r = await fetch(BU + (BU.includes("?") ? "&" : "?") + "t=" + Date.now());
       if (!r.ok) throw new Error("HTTP " + r.status);
       const rows = parseBeeping(await r.text());
       if (!rows.length) throw new Error("no encuentro la tabla de Registro-Base");
       Object.assign(beeping, { rows, fuente: "Google Sheet en directo", fecha: new Date().toISOString() });
       const snap = db.sistema.find(x => x.id === "beeping");
-      if (online && (!snap || Date.now() - new Date(snap.fecha).getTime() > 30 * 60e3)) save("sistema", { id: "beeping", fecha: beeping.fecha, fuente: "Google Sheet", filas: rows });
+      if (online && (!snap || Date.now() - new Date(snap.fecha).getTime() > 10 * 60e3)) save("sistema", { id: "beeping", fecha: beeping.fecha, fuente: "Google Sheet (app de Cristian)", filas: rows });
       return;
     } catch (e) { beeping.error = "No se pudo leer el Google Sheet (" + e.message + "). Se muestra la última copia guardada."; }
   }
@@ -1049,6 +1053,9 @@ views.ajustes = () => `<h1>Ajustes</h1>
   <div class="card"><h3>Conexión</h3><p>Estado: <b>${online ? "conectado a Supabase ✅" : "sin conexión (modo local) ⚠️"}</b></p>
   <p class="hint">Proyecto: <code>${esc(C.supabaseUrl)}</code> · tabla <code>${esc(C.tabla)}</code> · claves <code>${esc(C.prefijo)}*</code> · se refresca cada ${C.refrescoSegundos} s.</p>
   <button class="btn sec" id="reload">🔄 Recargar datos</button></div>
+  <div class="card"><h3>Sheet contable (Beeping) en directo</h3><p class="hint">Pega aquí el enlace del Sheet «Control Contable de Tienda Aurialo». Se guarda solo en este dispositivo (no en la web) y la app leerá la pestaña Registro-Base en directo cada 5 minutos. Sin él, la app usa la copia que el agente actualiza cada hora.</p>
+  <div class="toolbar"><input id="sheet-id" style="flex:1;min-width:220px" placeholder="https://docs.google.com/spreadsheets/d/…" value="${esc(sheetId() ? "https://docs.google.com/spreadsheets/d/" + sheetId() : "")}"><button class="btn" id="sheet-save">Guardar</button></div>
+  <div class="hint">${beeping.fuente ? `Ahora: ${esc(beeping.fuente)}${beeping.fecha ? " · " + new Date(beeping.fecha).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}` : ""}${beeping.error ? ` · ⚠️ ${esc(beeping.error)}` : ""}</div></div>
   <div class="card"><h3>Copia de seguridad</h3><p class="hint">Copia todos los datos en formato JSON para guardarlos donde quieras, o restaura una copia anterior.</p>
   <button class="btn sec" id="bk-copy">📋 Copiar copia de seguridad</button> <button class="btn sec" id="bk-rest">♻️ Restaurar copia</button></div>
   <div class="card"><h3>Reglas de decisión de Meta Ads</h3><ul class="rules">
@@ -1058,6 +1065,9 @@ views.ajustes = () => `<h1>Ajustes</h1>
     <li>«No relanzar»: ROAS &lt; ${C.reglas.roasDescartar}× o ${eur(C.reglas.gastoSinVentas)} gastados sin ventas</li></ul>
   <p class="hint">Se cambian en <code>config.js</code> del repositorio.</p></div>`;
 views.ajustes.bind = () => {
+  const sb = $("#sheet-save"); if (sb) sb.onclick = async () => { const v = $("#sheet-id").value.trim(); const m = v.match(/\/d\/([a-zA-Z0-9_-]{20,})/) || v.match(/^([a-zA-Z0-9_-]{20,})$/);
+    try { if (m) localStorage.setItem("sheet_contable", m[1]); else localStorage.removeItem("sheet_contable"); } catch (e) {}
+    await loadBeeping(); toast(beeping.error ? "⚠️ " + beeping.error : m ? `✔ Sheet conectado: ${beeping.rows.length} días` : "Sheet quitado"); render(); };
   $("#reload").onclick = async () => { await load(); render(); toast("Datos recargados"); };
   $("#bk-copy").onclick = () => { const txt = JSON.stringify(db, null, 1);
     openModal("Copia de seguridad", `<textarea id="bk" style="min-height:260px">${esc(txt)}</textarea><div class="form-actions"><button class="btn" id="bk-c">Copiar</button></div>`);
@@ -1295,6 +1305,6 @@ $("#yo").onchange = e => { localStorage.setItem("crm_yo", e.target.value); rende
     await save("sistema", { id: "seed", fecha: today() });
   }
   render();
-  setInterval(async () => { if (!$("#modal").classList.contains("hidden") || ["INPUT", "TEXTAREA", "IFRAME"].includes(document.activeElement?.tagName) || $("#inc-frame")) return; await load(); if (!C.beepingCsvUrl || Date.now() - new Date(beeping.fecha || 0).getTime() > 5 * 60e3) await loadBeeping(); render(); }, C.refrescoSegundos * 1000);
+  setInterval(async () => { if (!$("#modal").classList.contains("hidden") || ["INPUT", "TEXTAREA", "IFRAME"].includes(document.activeElement?.tagName) || $("#inc-frame")) return; await load(); if (!beepingUrl() || Date.now() - new Date(beeping.fecha || 0).getTime() > 5 * 60e3) await loadBeeping(); render(); }, C.refrescoSegundos * 1000);
 })();
 })();
