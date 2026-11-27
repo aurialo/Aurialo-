@@ -193,6 +193,7 @@ const pct = (a, b) => b ? Math.round(a * 100 / b) + '%' : '—';
 const fmtD = s => { if (!s) return '—'; const d = new Date(String(s).replace(' ', 'T')); return isNaN(d) ? s : d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }); };
 const fmtDT = s => { if (!s) return '—'; const d = new Date(String(s).replace(' ', 'T')); return isNaN(d) ? s : d.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); };
 const daysSince = s => s ? Math.max(0, (Date.now() - new Date(String(s).replace(' ', 'T'))) / 864e5) : 0;
+const EQM = new URLSearchParams(location.search).get('modo') === 'equipo';   // panel del equipo: sin importes, foco en rendimiento
 const LS = { get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
 
 let DATA = null, CHANGES = [];
@@ -312,12 +313,17 @@ function render() {
       <div class="legend"><span><i style="background:var(--ok)"></i>Entregadas</span><span><i style="background:var(--warn)"></i>En curso</span><span><i style="background:var(--bad)"></i>Devueltas</span></div>
     </div>
   </div>
-  <div class="money">
+  ${EQM ? `<div class="money">
+    <div class="kpi"><div class="eyebrow">% gestionadas</div><div class="v num">${pct(G, T)}</div><div class="s">${G} de ${T} incidencias</div></div>
+    <div class="kpi"><div class="eyebrow">Entregadas tras incidencia</div><div class="v num" style="color:var(--ok)">${deliveredAll}</div><div class="s">Pedidos salvados gracias a la gestión</div></div>
+    <div class="kpi"><div class="eyebrow">Devueltas o destruidas</div><div class="v num" style="color:var(--bad)">${cnt(r => r.c.fin === 'perdido')}</div><div class="s">${cnt(r => r.c.fin === 'curso')} todavía en tránsito</div></div>
+    <div class="kpi"><div class="eyebrow">Tasa de entrega global</div><div class="v num">${pct(deliveredAll, cnt(r => r.c.fin !== 'curso'))}</div><div class="s">Sobre incidencias con tracking final</div></div>
+  </div></section>` : `<div class="money">
     <div class="kpi"><div class="eyebrow">Contrarreembolso cobrado</div><div class="v num" style="color:var(--ok)">${eur(sum(r => r.c.fin === 'entregado'))}</div><div class="s">${deliveredAll} pedidos entregados tras incidencia</div></div>
     <div class="kpi"><div class="eyebrow">En juego</div><div class="v num" style="color:var(--warn)">${eur(sum(r => r.c.fin === 'curso'))}</div><div class="s">${cnt(r => r.c.fin === 'curso')} pedidos todavía en tránsito</div></div>
     <div class="kpi"><div class="eyebrow">Perdido</div><div class="v num" style="color:var(--bad)">${eur(sum(r => r.c.fin === 'perdido'))}</div><div class="s">${cnt(r => r.c.fin === 'perdido')} devueltos o destruidos</div></div>
     <div class="kpi"><div class="eyebrow">Tasa de entrega global</div><div class="v num">${pct(deliveredAll, cnt(r => r.c.fin !== 'curso'))}</div><div class="s">Sobre incidencias con tracking final</div></div>
-  </div></section>`;
+  </div></section>`}`;
   html += monthly(rows);
   html += `<section><div class="sec-head"><h2>Desglose</h2></div><div class="grid2">
     <div class="panel"><h3 style="font-size:14px;margin-bottom:10px">Entrada semanal de incidencias por resultado</h3><div class="chartbox">${weekly(rows)}</div>
@@ -367,6 +373,29 @@ function monthly(rows) {
   const pp = v => Math.round(v * 100) + ' pts', n1 = v => v.toLocaleString('es-ES', { maximumFractionDigits: 1 });
   const paceC = c.t / days(cur), paceP = p ? p.t / days(pk) : null;
   const rc = rate(c), rp = p ? rate(p) : null, gc = c.t ? c.g / c.t : null, gp = p && p.t ? p.g / p.t : null;
+  const resc = o => o.retCl ? o.retOk / o.retCl : null;
+  const mejor = ks.filter(k => k < cur && rate(M[k]) != null).sort((a, b) => rate(M[b]) - rate(M[a]))[0];
+  const fbl = [];
+  if (EQM) {
+    const cmp = (a, b, txt, inv) => { if (a == null) return; if (b == null) { fbl.push(['acc', `${txt}: <b>${Math.round(a * 100)} %</b> este mes.`]); return; } const d = a - b, good = inv ? d < 0 : d > 0;
+      fbl.push([Math.abs(d) < .01 ? 'acc' : good ? 'ok' : 'bad', `${txt}: <b>${Math.round(a * 100)} %</b> este mes frente a ${Math.round(b * 100)} % en ${esc(lab(pk).split(' ')[0])}${Math.abs(d) < .01 ? ' (igual)' : good ? ` <b>▲ ${Math.round(Math.abs(d) * 100)} pts</b>, ¡bien!` : ` <b>▼ ${Math.round(Math.abs(d) * 100)} pts</b>`}.`]); };
+    cmp(gc, gp, '% de incidencias gestionadas');
+    cmp(rc, rp, 'Tasa de entrega de las incidencias');
+    cmp(resc(c), p ? resc(p) : null, 'Tasa de rescate de los reintentos');
+    fbl.push(c.sinAbiertas ? ['bad', `Quedan <b>${c.sinAbiertas}</b> incidencias de este mes abiertas sin ninguna acción: gestionadlas hoy.`] : ['ok', 'Ninguna incidencia de este mes está sin gestionar. ¡Perfecto!']);
+    if (mejor) fbl.push(['acc', `Vuestro mejor mes en entrega fue ${esc(lab(mejor))} con un ${Math.round(rate(M[mejor]) * 100)} %. Esa es la referencia a superar.`]);
+  }
+  if (EQM) return `<section><div class="sec-head"><h2>Mes a mes</h2><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="muted" style="font-size:12.5px">${esc(lab(cur))} va por el día ${now.getDate()} · agrupar por</span><div class="tabs" role="group"><button type="button" data-mby="rep" aria-pressed="${!byOc}">Fecha de la incidencia</button><button type="button" data-mby="oc" aria-pressed="${byOc}">Fecha del pedido</button></div></div></div>
+  <div class="panel" style="margin-bottom:10px"><div class="eyebrow" style="margin-bottom:6px">Cómo vais este mes</div>${fbl.map(([k, t]) => `<div style="display:flex;gap:8px;align-items:flex-start;margin:6px 0"><span class="pill p-${k}" style="min-width:10px">&nbsp;</span><span>${t}</span></div>`).join('')}</div>
+  <div class="money" style="margin-top:0">
+    <div class="kpi"><div class="eyebrow">% gestionadas · ${esc(lab(cur).split(' ')[0])}</div><div class="v num">${gc == null ? '—' : Math.round(gc * 100) + '%'}</div><div class="s">${delta(gc, gp, false, pp)}</div></div>
+    <div class="kpi"><div class="eyebrow">Tasa de entrega · ${esc(lab(cur).split(' ')[0])}</div><div class="v num">${rc == null ? '—' : Math.round(rc * 100) + '%'}</div><div class="s">${delta(rc, rp, false, pp)}</div></div>
+    <div class="kpi"><div class="eyebrow">Rescate de reintentos</div><div class="v num">${resc(c) == null ? '—' : Math.round(resc(c) * 100) + '%'}</div><div class="s">${delta(resc(c), p ? resc(p) : null, false, pp)}</div></div>
+    <div class="kpi"><div class="eyebrow">Sin gestionar</div><div class="v num" style="color:var(${c.sinAbiertas ? '--bad' : '--ok'})">${c.sinAbiertas}</div><div class="s">Abiertas sin acción este mes</div></div>
+  </div>
+  <div class="grid2" style="margin-top:10px"><div class="panel"><h3 style="font-size:14px;margin-bottom:10px">Resultado por mes</h3><div class="chartbox">${monthChart(ks.slice(-12), M, lab)}</div><div class="legend"><span><i style="background:var(--ok)"></i>Entregadas</span><span><i style="background:var(--warn)"></i>En curso</span><span><i style="background:var(--bad)"></i>Perdidas</span><span>Línea = tasa de entrega</span></div></div>
+  <div class="panel"><h3 style="font-size:14px;margin-bottom:10px">Tasa de entrega por mes</h3>${ks.slice(-12).map(k => { const r = rate(M[k]); return `<div style="display:grid;grid-template-columns:110px 1fr 44px;gap:10px;align-items:center;font-size:12.5px;margin-bottom:6px"><span>${esc(lab(k))}${k === mejor ? ' ⭐' : ''}</span><span style="display:block;height:12px;background:var(--sunk);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:${r == null ? 0 : r * 100}%;background:var(--ok)"></i></span><span class="num" style="text-align:right">${r == null ? '—' : Math.round(r * 100) + '%'}</span></div>`; }).join('')}</div></div>
+  <div class="tablebox" style="margin-top:10px"><table style="min-width:760px"><thead><tr><th>Mes</th><th>Incidencias</th><th>% gestionadas</th><th>Sin gestionar</th><th>Entregadas</th><th>Devueltas</th><th>En curso</th><th>Tasa entrega</th><th>Rescate reintentos</th></tr></thead><tbody>${ks.slice().reverse().map(k => { const o = M[k], r = rate(o); return `<tr${k === cur ? ' style="background:var(--accent-soft)"' : ''}><td><b>${esc(lab(k))}</b>${k === cur ? ' <span class="pill p-acc">en curso</span>' : ''}${k === mejor ? ' ⭐' : ''}</td><td class="num">${o.t}</td><td class="num">${pct(o.g, o.t)}</td><td class="num" style="${o.sinAbiertas ? 'color:var(--bad);font-weight:600' : ''}">${o.n}</td><td class="num" style="color:var(--ok)">${o.ok}</td><td class="num" style="color:var(--bad)">${o.bad}</td><td class="num">${o.cur}</td><td class="num"><b>${r == null ? '—' : Math.round(r * 100) + '%'}</b></td><td class="num">${pct(o.retOk, o.retCl)}</td></tr>`; }).join('')}</tbody></table></div></section>`;
   return `<section><div class="sec-head"><h2>Mes a mes</h2><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="muted" style="font-size:12.5px">${esc(lab(cur))} va por el día ${now.getDate()} · agrupar por</span><div class="tabs" role="group"><button type="button" data-mby="rep" aria-pressed="${!byOc}">Fecha de la incidencia</button><button type="button" data-mby="oc" aria-pressed="${byOc}">Fecha del pedido</button></div></div></div>
   <div class="money" style="margin-top:0">
     <div class="kpi"><div class="eyebrow">Incidencias en ${esc(lab(cur).split(' ')[0])}</div><div class="v num">${c.t}</div><div class="s">${n1(paceC)} al día · ${delta(paceC, paceP, true, v => n1(v) + '/día')}</div></div>
@@ -414,11 +443,11 @@ function table(rows, newSet) {
   const sk = { rep: r => r.rep || '', ref: r => +String(r.ref).replace(/\D/g, ''), tot: r => +r.tot || 0, age: r => r.c.age, lu: r => r.lu || '' }[state.sort] || (r => r.rep);
   list.sort((a, b) => (sk(a) > sk(b) ? 1 : sk(a) < sk(b) ? -1 : 0) * state.dir);
   const th = (k, l) => `<th data-sort="${k}">${l}${state.sort === k ? (state.dir < 0 ? ' ↓' : ' ↑') : ''}</th>`;
-  let h = `<table><thead><tr><th class="sev"></th>${th('ref', 'Pedido')}<th>Cliente</th><th>Mensajería · tracking</th><th>Motivo</th>${th('rep', 'Reportada')}${th('age', 'Días')}<th>Gestión</th><th>Estado incidencia</th>${th('lu', 'Tracking actual')}${th('tot', 'Importe')}</tr></thead><tbody>`;
+  let h = `<table><thead><tr><th class="sev"></th>${th('ref', 'Pedido')}<th>Cliente</th><th>Mensajería · tracking</th><th>Motivo</th>${th('rep', 'Reportada')}${th('age', 'Días')}<th>Gestión</th><th>Estado incidencia</th>${th('lu', 'Tracking actual')}${EQM ? '' : th('tot', 'Importe')}</tr></thead><tbody>`;
   if (!list.length) h += `<tr><td colspan="11" class="empty">No hay incidencias en esta vista.</td></tr>`;
   list.forEach(r => { const b = BUCKET[r.c.bucket]; const isNew = newSet.has(r.id);
     const gest = r.c.last ? `<b>${esc(r.c.last.n)}</b><div class="muted" style="font-size:12px">${esc(fmtDT(r.c.last.d))}${r.c.errs ? ` · <span style="color:var(--bad)">${r.c.errs} fallida${r.c.errs > 1 ? 's' : ''}</span>` : ''}</div>` : '<span style="color:var(--bad);font-weight:600">Sin acción</span>';
-    h += `<tr class="row" data-id="${esc(r.id)}"><td class="sev ${b.sev}"></td><td><b class="mono">${esc(r.ref)}</b>${isNew ? ' <span class="pill p-new">Nueva</span>' : ''}</td><td>${esc(r.cli)}</td><td>${esc(r.cou)}<div>${r.url ? `<a class="mono" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.trk)}</a>` : `<span class="mono">${esc(r.trk)}</span>`}</div></td><td>${esc(r.tipo || '')}<div class="muted" style="font-size:12px">${esc(r.ext || '')}</div></td><td class="num">${esc(fmtD(r.rep))}</td><td class="num">${r.st === 'pending' ? Math.floor(r.c.age) : '<span class="muted">—</span>'}</td><td>${gest}</td><td><span class="pill ${b.p}">${b.l}</span><div class="muted" style="font-size:12px;margin-top:3px">Beeping: ${r.st === 'pending' ? 'pendiente' : r.st === 'resolved' ? 'resuelta' : esc(r.st)}</div></td><td>${shipPill(r.ship)}<div class="muted" style="font-size:12px;margin-top:3px">${esc(fmtDT(r.lu))}</div></td><td class="num">${eur(r.tot)}</td></tr>`;
+    h += `<tr class="row" data-id="${esc(r.id)}"><td class="sev ${b.sev}"></td><td><b class="mono">${esc(r.ref)}</b>${isNew ? ' <span class="pill p-new">Nueva</span>' : ''}</td><td>${esc(r.cli)}</td><td>${esc(r.cou)}<div>${r.url ? `<a class="mono" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.trk)}</a>` : `<span class="mono">${esc(r.trk)}</span>`}</div></td><td>${esc(r.tipo || '')}<div class="muted" style="font-size:12px">${esc(r.ext || '')}</div></td><td class="num">${esc(fmtD(r.rep))}</td><td class="num">${r.st === 'pending' ? Math.floor(r.c.age) : '<span class="muted">—</span>'}</td><td>${gest}</td><td><span class="pill ${b.p}">${b.l}</span><div class="muted" style="font-size:12px;margin-top:3px">Beeping: ${r.st === 'pending' ? 'pendiente' : r.st === 'resolved' ? 'resuelta' : esc(r.st)}</div></td><td>${shipPill(r.ship)}<div class="muted" style="font-size:12px;margin-top:3px">${esc(fmtDT(r.lu))}</div></td>${EQM ? '' : `<td class="num">${eur(r.tot)}</td>`}</tr>`;
     if (state.open[r.id]) h += `<tr class="det"><td colspan="11"><div class="hist">${r.h.length ? r.h.map(a => `<div><span class="muted num">${esc(fmtDT(a.d))}</span><span><span class="pill ${a.s === 'ok' ? 'p-ok' : 'p-bad'}">${a.s === 'ok' ? 'OK' : 'Error'}</span> <b>${esc(a.n)}</b>${a.o ? ` · <span class="muted">${esc(a.o)}</span>` : ''}</span></div>`).join('') : '<div><span class="muted">—</span><span>No se ha enviado ninguna acción para esta incidencia.</span></div>'}<div><span class="muted">Pedido creado</span><span>${esc(fmtD(r.oc))}${r.res ? ` · incidencia cerrada ${esc(fmtDT(r.res))}` : ''}</span></div></div></td></tr>`;
   });
   h += '</tbody></table>';

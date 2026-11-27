@@ -731,7 +731,7 @@ views.logistica = () => {
     const f = ui.filters.inc || (ui.filters.inc = { est: "abiertas", modo: "beeping" });
     const sw = `<div class="tabs" style="border:0;margin-bottom:10px">${[["beeping", "📦 Beeping (automático)"], ["manual", "✍️ Registro manual"]].map(([k, l]) => `<button data-incmodo="${k}" class="${(f.modo || "beeping") === k ? "active" : ""}">${l}</button>`).join("")}</div>`;
     if ((f.modo || "beeping") === "beeping") {
-      body = sw + `<iframe id="inc-frame" src="incidencias.html" title="Incidencias de Beeping" style="width:100%;border:0;min-height:700px;display:block"></iframe>`;
+      body = sw + `<iframe id="inc-frame" src="incidencias.html${EQ ? "?modo=equipo" : ""}" title="Incidencias de Beeping" style="width:100%;border:0;min-height:700px;display:block"></iframe>`;
     } else {
     const rows = db.incidencias.filter(i => f.est === "todas" || (f.est === "abiertas" ? ["Abierta", "Gestionada"].includes(i.estado) : i.estado === f.est))
       .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
