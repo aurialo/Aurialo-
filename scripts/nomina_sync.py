@@ -173,13 +173,16 @@ def main():
         etiqueta = f"{NOMBRE_MES[mm]} {y}"
         tot_h = round(sum(x["pagoHoras"] for x in per.values()), 2)
         tot_b = round(sum(x["carritos"] + x["bonus"] for x in per.values()), 2)
-        for gid, concepto, fecha, importe, nota in [
-            (f"nomina_horas_{mes}", f"Equipo logístico · horas {etiqueta}", meses[mes]["pagoHorasFecha"], tot_h,
-             " · ".join(f"{p} {int(per[p]['horas'])}:{round(per[p]['horas'] % 1 * 60):02d} h = {per[p]['pagoHoras']:.2f} €" for p in EQUIPO)),
-            (f"nomina_bonus_{mes}", f"Equipo logístico · bonus y carritos {etiqueta}", meses[mes]["pagoBonusFecha"], tot_b,
-             f"{n_carr} carritos entregados · bonus {int((pc + pe) * 100)} % del neto ({b['beneficio']:.2f} €) · confirmación "
-             f"{(b['pConf'] or 0) * 100:.1f} % · entrega {(b['pEnt'] or 0) * 100:.1f} % · {'PROVISIONAL' if meses[mes]['provisional'] else 'definitivo'}"),
-        ]:
+        pagos = [(f"nomina_horas_{mes}_{p}", f"{p} · horas {etiqueta}", meses[mes]["pagoHorasFecha"], per[p]["pagoHoras"],
+                  f"{int(per[p]['horas'])}:{round(per[p]['horas'] % 1 * 60):02d} h × {PRECIO_HORA:.2f} €") for p in EQUIPO]
+        pagos.append((f"nomina_bonus_{mes}", f"Equipo logístico · bonus y carritos {etiqueta}", meses[mes]["pagoBonusFecha"], tot_b,
+             " · ".join(f"{p} {per[p]['carritos'] + per[p]['bonus']:.2f} €" for p in EQUIPO) + f" · {n_carr} carritos entregados · bonus {int((pc + pe) * 100)} % del neto ({b['beneficio']:.2f} €) · confirmación "
+             f"{(b['pConf'] or 0) * 100:.1f} % · entrega {(b['pEnt'] or 0) * 100:.1f} % · {'PROVISIONAL' if meses[mes]['provisional'] else 'definitivo'}"))
+        # el antiguo pago conjunto de horas se retira si aún no se ha pagado
+        viejo = get(f"crm:gastos:nomina_horas_{mes}")
+        if viejo and not viejo.get("pagado") and not dry:
+            urllib.request.urlopen(urllib.request.Request(URL + "?clave=eq." + urllib.parse.quote(f"crm:gastos:nomina_horas_{mes}"), method="DELETE", headers=H), timeout=30).read()
+        for gid, concepto, fecha, importe, nota in pagos:
             g = get(f"crm:gastos:{gid}")
             if g and g.get("pagado"): continue
             if not g and importe <= 0: continue

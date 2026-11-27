@@ -91,4 +91,4 @@ Pestaña **Equipo logístico → Nómina** (oculta en el panel del equipo). El a
 - 3 €/hora → pago el día 12 del mes siguiente.
 - 0,50 € por carrito recuperado que pasa a ENTREGADO (cuenta en el mes en que se ve entregado), a partes iguales.
 - Bonus sobre el neto mensual de Beeping: confirmación ≥ 80 % → 5 %, ≥ 88 % → 10 %; entrega ≥ 80 % → 5 %, ≥ 85 % → 10 %; a partes iguales. Bonus y carritos → pago el día 25 del mes siguiente.
-Crea o actualiza en Gastos los pagos `nomina_horas_<mes>` y `nomina_bonus_<mes>` (no toca los ya marcados como pagados). Las reglas están al principio del script.
+Crea o actualiza en Gastos un pago de horas por persona (`nomina_horas_<mes>_<nombre>`) y el de bonus y carritos (`nomina_bonus_<mes>`) (no toca los ya marcados como pagados). Las reglas están al principio del script.
