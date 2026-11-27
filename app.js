@@ -987,7 +987,7 @@ function pedirPin() {
     ov.innerHTML = `<div class="card" style="width:320px;text-align:center"><h2 style="margin-top:0">🔒 Aurialo CRM</h2><p class="hint">Introduce el PIN de acceso</p>
       <input id="pin-in" type="password" inputmode="numeric" style="width:100%;text-align:center;font-size:22px;letter-spacing:6px" autofocus>
       <div id="pin-err" class="hint" style="color:var(--bad);min-height:18px;margin-top:6px"></div><button class="btn" id="pin-ok" style="width:100%">Entrar</button>
-      <p class="hint" style="margin-top:12px">¿Eres del equipo logístico? Entra en <a href="/equipo">aurialo.netlify.app/equipo</a></p></div>`;
+      <p class="hint" style="margin-top:12px">¿Eres del equipo logístico? Entra en <a href="equipo.html">el panel del equipo</a></p></div>`;
     document.body.appendChild(ov);
     const go = async () => { if (await sha256($("#pin-in").value.trim()) === C.pinHash) { localStorage.setItem("crm_pin", C.pinHash); ov.remove(); res(); } else { $("#pin-err").textContent = "PIN incorrecto"; $("#pin-in").value = ""; } };
     $("#pin-ok").onclick = go; $("#pin-in").onkeydown = e => { if (e.key === "Enter") go(); };
@@ -1035,9 +1035,9 @@ function render() {
 const NAV = EQ ? [["mipanel", "🏠 Mi panel"], ["logistica", "📦 Logística"]]
   : [["panel", "📊 Panel"], ["meta", "📈 Meta Ads"], ["creativo", "🎬 Director creativo"], ["logistica", "📦 Equipo logístico"], ["competencia", "🔎 Competencia"], ["ajustes", "⚙️ Ajustes"]];
 $("#nav").innerHTML = NAV.map(([k, l]) => `<button data-view="${k}">${l}</button>`).join("")
-  + (!EQ ? `<a href="/equipo" target="_blank" rel="noopener" style="display:block;margin-top:12px;padding:10px 12px;border-radius:8px;color:var(--side-text);text-decoration:none;border:1px dashed #2c4475">👥 Ver panel del equipo ↗</a>
+  + (!EQ ? `<a href="equipo.html" target="_blank" rel="noopener" style="display:block;margin-top:12px;padding:10px 12px;border-radius:8px;color:var(--side-text);text-decoration:none;border:1px dashed #2c4475">👥 Ver panel del equipo ↗</a>
       <button id="lock-crm" title="Olvida el PIN en este navegador" style="margin-top:6px">🔒 Bloquear CRM</button>`
-    : (C.pinHash && localStorage.getItem("crm_pin") === C.pinHash ? `<a href="/" style="display:block;margin-top:12px;padding:10px 12px;border-radius:8px;color:var(--side-text);text-decoration:none;border:1px dashed #2c4475">← Volver a mi CRM</a>` : ""));
+    : (C.pinHash && localStorage.getItem("crm_pin") === C.pinHash ? `<a href="index.html" style="display:block;margin-top:12px;padding:10px 12px;border-radius:8px;color:var(--side-text);text-decoration:none;border:1px dashed #2c4475">← Volver a mi CRM</a>` : ""));
 if (EQ) { ui.view = "mipanel"; document.title = "Aurialo · Equipo logístico"; document.querySelector(".brand").innerHTML = '<span class="dot"></span>Aurialo <b>Logística</b>'; }
 $("#nav").onclick = e => { const b = e.target.closest("button"); if (b && b.id === "lock-crm") { localStorage.removeItem("crm_pin"); location.reload(); return; } if (b) { ui.view = b.dataset.view; location.hash = ui.view; render(); } };
 if (EQ && !localStorage.getItem("crm_yo")) localStorage.setItem("crm_yo", C.equipo.find(p => p !== "Cristian") || C.equipo[0]);

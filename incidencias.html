@@ -458,7 +458,7 @@ function table(rows, newSet) {
 }
 
 /* Código del marcador: la función de arriba con la URL de Supabase y del CRM incrustadas */
-const crmUrl = location.origin + '/#logistica';
+const crmUrl = new URL('index.html#logistica', location.href).href;
 $('#bmCode').value = 'javascript:(' + marcadorBeeping.toString().replace(/\n\s*/g, ' ') + ')(' + JSON.stringify(SB) + ',' + JSON.stringify(K) + ',' + JSON.stringify(crmUrl) + ');void 0';
 $('#btnSync').onclick = () => { $('#syncSec').hidden = false; $('#syncSec').scrollIntoView({ behavior: 'smooth' }); };
 $('#btnCloseSync').onclick = () => { $('#syncSec').hidden = true; };
