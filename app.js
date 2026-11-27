@@ -300,7 +300,6 @@ function panelHoy() {
   if (listos.length) pendientes.push(`${listos.length} creativos listos para lanzar (${listos.slice(0, 3).map(p => esc(nombreCreativo(p))).join(", ")}${listos.length > 3 ? "…" : ""})`);
   if ([2, 4].includes(w) && !listos.length) pendientes.push("Hoy es día de lanzamiento y no hay creativos en «Listo»");
   tar.slice(0, 6).forEach(t => pendientes.push(`Tarea: ${esc(t.titulo)} <span class="hint">· ${esc(t.responsable || "")}${t.fecha ? " · " + fdate(t.fecha) : ""}${t.prioridad === "Alta" ? " · <b style='color:var(--bad)'>alta</b>" : ""}</span>`));
-  if (!EQ) stockAlertas().forEach(p => pendientes.push(`📦 <b>${esc(p.nombre)}</b>: ${p.disponible} uds · ${p.diasCobertura != null ? `quedan ~${String(p.diasCobertura).replace(".", ",")} días (se acaba ~${fdate(p.agotaEl)})` : "<b style='color:var(--bad)'>agotado</b>"} → <a href="#stock">Stock</a>`));
   if (!EQ) proximosGastos(30).filter(x => x.d <= n(x.g.avisoDias ?? 4)).forEach(x => pendientes.push(`💸 <b>${esc(x.g.concepto)}</b> · ${eur(n(x.g.importe))} se cobra ${x.d < 0 ? `<b style="color:var(--bad)">(vencido hace ${-x.d} d, márcalo como pagado)</b>` : x.d === 0 ? "<b>hoy</b>" : x.d === 1 ? "<b>mañana</b>" : `en ${x.d} días (${fdate(x.f)})`} → <a href="#gastos">Gastos</a>`));
   if (!agReciente) pendientes.push(`El agente Analíticas Meta Ads aún no ha dejado sus recomendaciones (sale lunes, miércoles y viernes a las 8:03)`);
   const col = (titulo, cls, items, vacio, nota) => `<div class="card" style="margin:0;border-top:4px solid var(--${cls})"><h3 style="margin:0">${titulo} <span class="hint">${(items || []).length}</span></h3>${nota ? `<div class="hint" style="margin:2px 0 4px">${nota}</div>` : ""}${listaAccion(items, vacio)}</div>`;
@@ -309,6 +308,7 @@ function panelHoy() {
     <div style="margin-top:10px">${fb.slice(0, 8).map(notaCard).join("")}${fb.length > 8 ? `<div class="hint">…y ${fb.length - 8} más en Notas del equipo</div>` : ""}</div></div>` : "";
   return `<h1>Hoy · ${esc(dia)}</h1><div class="sub">Qué hacer hoy, lo pendiente y cómo va la tienda.</div>
   ${fbCard}
+  ${!EQ ? stockPanel() : ""}
   <div class="card"><h3 style="margin:0 0 10px">🏪 Resumen de la tienda</h3><div class="grid">
     ${kpi(`Pedidos hoy · Shopify`, sHoy ? `${sHoy.pedidos} pedidos` : "—", sHoy ? `${eur(sHoy.ventas)} · ${mix(sHoy)}${sh.ultimoPedido ? ` · último ${esc(sh.ultimoPedido.name)} a las ${new Date(sh.ultimoPedido.createdAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" })}` : ""}` : "Sin datos de hoy todavía")}
     ${kpi("Ayer · Shopify", sAyer ? `${sAyer.pedidos} pedidos` : "—", sAyer ? `${eur(sAyer.ventas)} · ${mix(sAyer)}${sAyer.manuales ? ` · ${sAyer.manuales} manuales` : ""}${media ? ` · media 7 días ${String(media.toFixed(1)).replace(".", ",")}` : ""}` : "")}
@@ -491,22 +491,48 @@ views.gastos.bind = () => {
 
 
 /* ----- Stock (Beeping) ----- */
-const ESTADO_STOCK = { "agotado": ["bad", "⛔ Agotado"], "reponer ya": ["bad", "🔴 Reponer ya"], "aviso": ["warn", "🟠 Pedir pronto"], "ok": ["ok", "🟢 Bien"], "sin ventas": ["info", "Sin ventas"], "sin stock": ["", "Sin stock"] };
-const stockAlertas = () => { const S = db.sistema.find(x => x.id === "stock"); return S ? (S.productos || []).filter(p => ["agotado", "reponer ya", "aviso"].includes(p.estado)) : []; };
+const ESTADO_STOCK = { "agotado": ["bad", "⛔ Agotado"], "rotura": ["bad", "🔴 Pedir YA · habrá rotura"], "pedir ya": ["warn", "🟠 Hay que pedir"], "ok": ["ok", "🟢 Bien"], "sin ventas": ["info", "Sin ventas"], "sin stock": ["", "Sin stock"] };
+const CS = Object.assign({ avisoDias: 20, plazoLaborables: 14, coberturaPedido: 30 }, C.stock || {});
+const sumaLab = (d, k) => { d = new Date(d); while (k > 0) { d.setDate(d.getDate() + 1); if (d.getDay() % 6) k--; } return d; };
+function stockCalc(p) {   // recalcula con la configuración actual (config.js → stock)
+  const llegada = sumaLab(Date.now(), CS.plazoLaborables), plazo = Math.round((llegada - Date.now()) / 864e5);
+  const dias = p.diasCobertura, iso = d => d.toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
+  const estado = p.estado === "agotado" || p.estado === "sin ventas" || p.estado === "sin stock" || dias == null ? p.estado : dias < plazo ? "rotura" : dias <= CS.avisoDias ? "pedir ya" : "ok";
+  return { ...p, estado, plazo, llegada: iso(llegada),
+    pedirAntes: dias == null ? null : iso(new Date(Date.now() + Math.max(0, dias - plazo) * 864e5)),
+    diasParaPedir: dias == null ? null : Math.max(0, Math.floor(dias - CS.avisoDias)),
+    sugerido: p.porDia > 0 && dias != null ? Math.max(0, Math.ceil(p.porDia * (plazo + CS.coberturaPedido) - p.disponible - (p.entrante || 0))) : 0 };
+}
+const stockLista = () => { const S = db.sistema.find(x => x.id === "stock"); return S ? (S.productos || []).map(stockCalc) : []; };
+const stockAlertas = () => stockLista().filter(p => ["agotado", "rotura", "pedir ya"].includes(p.estado));
+function stockPanel() {
+  const S = db.sistema.find(x => x.id === "stock"); if (!S) return "";
+  const L = stockLista().filter(p => p.diasCobertura != null || p.estado === "agotado").sort((a, b) => (a.diasCobertura ?? -1) - (b.diasCobertura ?? -1));
+  const al = L.filter(p => ["agotado", "rotura", "pedir ya"].includes(p.estado));
+  const fila = p => { const [c, t] = ESTADO_STOCK[p.estado] || ["", p.estado]; const pct = Math.max(3, Math.min(100, (p.diasCobertura || 0) / 60 * 100));
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap">
+      <div style="flex:1 1 170px"><b style="color:var(--strong)">${esc(p.nombre)}</b> <span class="pill ${c}" style="padding:2px 8px">${t}</span>
+        <div class="hint">${p.disponible} uds · ${String(p.porDia).replace(".", ",")}/día${p.entrante ? ` · ${p.entrante} entrantes` : ""}</div></div>
+      <div style="flex:1 1 120px"><div class="bar"><span style="width:${pct}%;background:var(--${c || "brand"})"></span></div><div class="hint">${p.diasCobertura != null ? `${String(p.diasCobertura).replace(".", ",")} días · se acaba ~${fdate(p.agotaEl)}` : "agotado"}</div></div>
+      <div style="flex:1 1 170px;font-size:13px">${p.estado === "ok" ? `Pedir dentro de <b>${p.diasParaPedir} días</b> (hacia el ${fdate(new Date(Date.now() + p.diasParaPedir * 864e5).toLocaleDateString("sv-SE"))})` : `<b>Pedir ya: ~${p.sugerido} uds</b><div class="hint">${p.estado === "rotura" ? `llegaría el ${fdate(p.llegada)}, después de agotarse` : `llegaría el ${fdate(p.llegada)}`}</div>`}</div></div>`; };
+  return `<div class="card" style="${al.length ? "border-left:4px solid var(--warn)" : ""}"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center"><h3 style="margin:0">📦 Stock y pedidos ${al.length ? `<span class="pill warn">${al.length} para pedir</span>` : ""}</h3>
+    <span class="hint">Aviso con ${CS.avisoDias} días de stock · plazo ${CS.plazoLaborables} días laborables (~${al[0] ? al[0].plazo : stockCalc({ diasCobertura: 1 }).plazo} naturales) · Beeping ${new Date(S.fecha).toLocaleString("es-ES", { weekday: "short", hour: "2-digit", minute: "2-digit" })} · <a href="#stock">detalle</a></span></div>
+    ${L.map(fila).join("")}</div>`;
+}
 views.stock = () => {
   const S = db.sistema.find(x => x.id === "stock");
   const marcador = `<a class="btn sec" id="stock-bm" href="#" title="Arrástralo a la barra de marcadores y púlsalo con Beeping abierto">📦 Stock → CRM</a>`;
   if (!S) return `<h1>📦 Stock</h1><div class="card empty">Aún no hay datos de stock. El agente «Stock Beeping» los lee cada mañana; también puedes usar el marcador ${marcador} con Beeping abierto.</div>`;
   const hace = Math.round((Date.now() - new Date(S.fecha).getTime()) / 36e5);
-  const L = [...(S.productos || [])].sort((a, b) => (a.diasCobertura ?? 1e9) - (b.diasCobertura ?? 1e9));
+  const L = stockLista().sort((a, b) => (a.diasCobertura ?? 1e9) - (b.diasCobertura ?? 1e9));
   const act = L.filter(p => p.enviadas14 >= 3 || p.disponible > 0);
   const al = stockAlertas();
   const fechas = Object.keys(S.historial || {}).sort().slice(-14);
   const spark = id => { const v = fechas.map(f => (S.historial[f] || {})[id]).filter(x => x != null); if (v.length < 2) return ""; const mx = Math.max(...v, 1), w = 90, h = 24;
     return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline fill="none" stroke="var(--brand)" stroke-width="2" points="${v.map((x, i) => `${(i / (v.length - 1) * (w - 4) + 2).toFixed(1)},${(h - 2 - x / mx * (h - 4)).toFixed(1)}`).join(" ")}"/></svg>`; };
-  return `<h1>📦 Stock</h1><div class="sub">Stock del almacén de Beeping y cuántos días te quedan al ritmo de envíos actual (el mayor entre la media de 7 y la de 14 días). Aviso con ${S.aviso} días o menos, «reponer ya» con ${S.critico}.</div>
+  return `<h1>📦 Stock</h1><div class="sub">Stock del almacén de Beeping y cuántos días te quedan al ritmo de envíos actual (el mayor entre la media de 7 y la de 14 días). Avisa para pedir cuando quedan ${CS.avisoDias} días: el pedido tarda ${CS.plazoLaborables} días laborables (10–12 del proveedor + 2 de Beeping). La cantidad sugerida cubre el plazo de entrega y ${CS.coberturaPedido} días más.</div>
   <div class="toolbar"><span class="hint">Actualizado ${hace < 1 ? "hace menos de 1 h" : `hace ${hace} h`} · ${new Date(S.fecha).toLocaleString("es-ES", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span><span class="grow"></span>${marcador}</div>
-  ${al.length ? `<div class="card" style="border-left:4px solid var(--bad);background:var(--bad-soft)"><b>⚠️ ${al.length} producto${al.length > 1 ? "s" : ""} con poco stock:</b> ${al.map(p => `${esc(p.nombre)} (${p.disponible} uds · ${p.diasCobertura != null ? `${String(p.diasCobertura).replace(".", ",")} días, se acaba ~${fdate(p.agotaEl)}` : "agotado"})`).join(" · ")}</div>` : `<div class="card" style="border-left:4px solid var(--ok)">✅ Todo el stock cubre más de ${S.aviso} días.</div>`}
+  ${al.length ? `<div class="card" style="border-left:4px solid var(--bad);background:var(--bad-soft)"><b>⚠️ Hay que pedir ${al.length} producto${al.length > 1 ? "s" : ""}:</b> ${al.map(p => `${esc(p.nombre)} ~${p.sugerido} uds (quedan ${p.diasCobertura != null ? `${String(p.diasCobertura).replace(".", ",")} días, se acaba ~${fdate(p.agotaEl)}` : "0: agotado"})`).join(" · ")}</div>` : `<div class="card" style="border-left:4px solid var(--ok)">✅ Todo el stock cubre más de ${CS.avisoDias} días.</div>`}
   <div class="grid">${act.map(p => { const [c, t] = ESTADO_STOCK[p.estado] || ["", p.estado];
     return `<div class="kpi" style="border-top:4px solid var(--${c || "line"})"><div class="l">${esc(p.nombre)} <span class="hint">${esc(p.code || "")}</span></div>
       <div class="v">${p.disponible} <span style="font-size:13px;font-weight:500" class="hint">uds</span></div>
@@ -520,6 +546,8 @@ views.stock = () => {
     { k: "porDia", label: "Uds/día", num: 1, h: p => String(p.porDia).replace(".", ",") },
     { k: "diasCobertura", label: "Días de stock", num: 1, v: p => p.diasCobertura ?? 1e9, h: p => p.diasCobertura != null ? String(p.diasCobertura).replace(".", ",") : "—" },
     { k: "agotaEl", label: "Se acaba", h: p => p.agotaEl ? fdate(p.agotaEl) : "—" },
+    { k: "pedirAntes", label: "Pedir antes del", h: p => p.pedirAntes ? fdate(p.pedirAntes) : "—" },
+    { k: "sugerido", label: "Pedido sugerido", num: 1, h: p => p.sugerido ? `${p.sugerido} uds` : "—" },
     { k: "estado", label: "Estado", h: p => { const [c, t] = ESTADO_STOCK[p.estado] || ["", p.estado]; return `<span class="pill ${c}">${t}</span>`; } }], L)}
   <div class="hint" style="margin-top:8px">Unidades enviadas = pedidos procesados por Beeping (no cuenta cancelados). «Por confirmar» son unidades de pedidos que aún pueden salir. Para actualizar a mano: arrastra el botón «📦 Stock → CRM» a la barra de marcadores y púlsalo con newapp.gobeeping.com abierto.</div>`;
 };

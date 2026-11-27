@@ -23,6 +23,8 @@ window.AURIALO_CONFIG = {
 
   // Objetivos del equipo logístico (panel /equipo)
   // conf: mínimo del objetivo de confirmación (78 %) · confTop: objetivo ideal (80 %) · confAviso: por debajo, en rojo
+  // Stock: aviso para pedir con 20 días de stock; el pedido tarda 10–12 días laborables del proveedor + 2 de Beeping
+  stock: { avisoDias: 20, plazoLaborables: 14, coberturaPedido: 30 },
   objetivos: { conf: 0.78, confTop: 0.80, confAviso: 0.70, entrega: 0.85, devol: 0.15, sinMotivo: 0.30 },
 
   // Economía por producto (calculada el 26/11/2026 con los pedidos de Beeping del 27/10 al 16/11:
