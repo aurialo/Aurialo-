@@ -505,19 +505,13 @@ function stockCalc(p) {   // recalcula con la configuración actual (config.js �
 }
 const stockLista = () => { const S = db.sistema.find(x => x.id === "stock"); return S ? (S.productos || []).map(stockCalc) : []; };
 const stockAlertas = () => stockLista().filter(p => ["agotado", "rotura", "pedir ya"].includes(p.estado));
-function stockPanel() {
+function stockPanel() {   // en el resumen solo sale lo que hay que pedir
   const S = db.sistema.find(x => x.id === "stock"); if (!S) return "";
-  const L = stockLista().filter(p => p.diasCobertura != null || p.estado === "agotado").sort((a, b) => (a.diasCobertura ?? -1) - (b.diasCobertura ?? -1));
-  const al = L.filter(p => ["agotado", "rotura", "pedir ya"].includes(p.estado));
-  const fila = p => { const [c, t] = ESTADO_STOCK[p.estado] || ["", p.estado]; const pct = Math.max(3, Math.min(100, (p.diasCobertura || 0) / 60 * 100));
-    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap">
-      <div style="flex:1 1 170px"><b style="color:var(--strong)">${esc(p.nombre)}</b> <span class="pill ${c}" style="padding:2px 8px">${t}</span>
-        <div class="hint">${p.disponible} uds · ${String(p.porDia).replace(".", ",")}/día${p.entrante ? ` · ${p.entrante} entrantes` : ""}</div></div>
-      <div style="flex:1 1 120px"><div class="bar"><span style="width:${pct}%;background:var(--${c || "brand"})"></span></div><div class="hint">${p.diasCobertura != null ? `${String(p.diasCobertura).replace(".", ",")} días · se acaba ~${fdate(p.agotaEl)}` : "agotado"}</div></div>
-      <div style="flex:1 1 170px;font-size:13px">${p.estado === "ok" ? `Pedir dentro de <b>${p.diasParaPedir} días</b> (hacia el ${fdate(new Date(Date.now() + p.diasParaPedir * 864e5).toLocaleDateString("sv-SE"))})` : `<b>Pedir ya: ~${p.sugerido} uds</b><div class="hint">${p.estado === "rotura" ? `llegaría el ${fdate(p.llegada)}, después de agotarse` : `llegaría el ${fdate(p.llegada)}`}</div>`}</div></div>`; };
-  return `<div class="card" style="${al.length ? "border-left:4px solid var(--warn)" : ""}"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center"><h3 style="margin:0">📦 Stock y pedidos ${al.length ? `<span class="pill warn">${al.length} para pedir</span>` : ""}</h3>
-    <span class="hint">Aviso con ${CS.avisoDias} días de stock · plazo ${CS.plazoLaborables} días laborables (~${al[0] ? al[0].plazo : stockCalc({ diasCobertura: 1 }).plazo} naturales) · Beeping ${new Date(S.fecha).toLocaleString("es-ES", { weekday: "short", hour: "2-digit", minute: "2-digit" })} · <a href="#stock">detalle</a></span></div>
-    ${L.map(fila).join("")}</div>`;
+  const al = stockAlertas().sort((a, b) => (a.diasCobertura ?? -1) - (b.diasCobertura ?? -1));
+  if (!al.length) return "";
+  const linea = p => `<li style="margin:6px 0"><b style="color:var(--strong)">${esc(p.nombre)}</b>: pedir <b>~${p.sugerido} uds</b> · quedan ${p.disponible} uds${p.diasCobertura != null ? ` (${String(p.diasCobertura).replace(".", ",")} días, se acaba ~${fdate(p.agotaEl)})` : " (agotado)"}${p.estado === "rotura" || p.estado === "agotado" ? ` · <b style="color:var(--bad)">pidiendo hoy llegaría el ${fdate(p.llegada)}, habrá rotura</b>` : ` · llegaría el ${fdate(p.llegada)}`}</li>`;
+  return `<div class="card" style="border-left:4px solid var(--${al.some(p => p.estado !== "pedir ya") ? "bad" : "warn"});background:var(--warn-soft)"><h3 style="margin:0 0 4px">📦 Hay que pedir stock</h3>
+    <ul class="rules" style="margin:4px 0;padding-left:18px">${al.map(linea).join("")}</ul><a href="#stock" class="hint">Ver todo el stock</a></div>`;
 }
 views.stock = () => {
   const S = db.sistema.find(x => x.id === "stock");
