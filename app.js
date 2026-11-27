@@ -3,7 +3,8 @@
    Si Supabase no responde, trabaja en local (localStorage) y avisa. */
 (() => {
 const C = window.AURIALO_CONFIG;
-const COLS = ["creativos", "produccion", "confirmaciones", "incidencias", "tareas", "competidores", "anuncios", "sistema"];
+const COLS = ["creativos", "produccion", "confirmaciones", "incidencias", "tareas", "competidores", "anuncios", "sistema", "notas"];
+const EQ = window.CRM_MODO === "equipo";   // panel del equipo logístico: solo logística y sin datos de dinero
 const db = Object.fromEntries(COLS.map(c => [c, []]));
 let online = false;
 const ui = { view: "panel", tabs: {}, sort: {}, filters: {} };
@@ -291,6 +292,10 @@ function panelHoy() {
   const pendientes = [];
   if (inc && inc.sinGestionar) pendientes.push(`<b style="color:var(--bad)">${inc.sinGestionar}</b> incidencias de Beeping sin gestionar${inc.masAntigua ? ` (la más antigua lleva ${inc.masAntigua} días)` : ""} → <a href="#logistica" data-goinc="1">Incidencias</a>`);
   if (inc && inc.zombies) pendientes.push(`${inc.zombies} incidencias abiertas en Beeping con el envío ya cerrado: cerrarlas`);
+  const dudas = db.notas.filter(x => x.tipo === "Duda para Cristian" && !x.respuesta);
+  if (dudas.length) pendientes.push(`<b>${dudas.length}</b> duda${dudas.length > 1 ? "s" : ""} del equipo sin responder → Equipo logístico → Notas del equipo`);
+  const notasHoy = db.notas.filter(x => x.tipo !== "Feedback de Cristian" && x.fecha && Date.now() - new Date(x.fecha).getTime() < 864e5);
+  if (notasHoy.length) pendientes.push(`${notasHoy.length} nota${notasHoy.length > 1 ? "s" : ""} nueva${notasHoy.length > 1 ? "s" : ""} del equipo en las últimas 24 h`);
   if (incMan.length) pendientes.push(`${incMan.length} incidencias del registro manual abiertas`);
   if (listos.length) pendientes.push(`${listos.length} creativos listos para lanzar (${listos.slice(0, 3).map(p => esc(nombreCreativo(p))).join(", ")}${listos.length > 3 ? "…" : ""})`);
   if ([2, 4].includes(w) && !listos.length) pendientes.push("Hoy es día de lanzamiento y no hay creativos en «Listo»");
@@ -638,9 +643,11 @@ const F_TAR = [
   { k: "estado", label: "Estado", type: "select", opts: ["Pendiente", "En curso", "Hecha"] }, { k: "fecha", label: "Fecha límite", type: "date" },
   { k: "notas", label: "Notas", type: "textarea", full: 1 }];
 views.logistica = () => {
-  const [tab, tabsHtml] = tabs("logistica", [["res", "Resultados (Beeping)"], ["mot", "Motivos de rechazo"], ["conf", "Confirmaciones WhatsApp"], ["inc", "Incidencias"], ["tar", "Tareas"]]);
+  const nPend = db.notas.filter(x => x.tipo === "Duda para Cristian" && !x.respuesta).length;
+  const [tab, tabsHtml] = tabs("logistica", [["res", "Resultados (Beeping)"], ["mot", "Motivos de rechazo"], ["conf", "Confirmaciones WhatsApp"], ["inc", "Incidencias"], ["tar", "Tareas"], ["notas", `📝 Notas del equipo${nPend ? ` (${nPend})` : ""}`]]);
   let body = "";
-  if (tab === "mot") {
+  if (tab === "notas") body = notasView();
+  else if (tab === "mot") {
     const M = db.sistema.find(x => x.id === "motivos");
     if (!M) body = `<div class="card empty">Aún no hay motivos cargados. El agente «Motivos de rechazo» los saca cada día del Sheet PEDIDOS E INCIDENCIAS.</div>`;
     else {
@@ -684,15 +691,15 @@ views.logistica = () => {
     <div class="grid">
       ${big("% Confirmación", pct(t.pConf), semaf(t.pConf, .75, .6), `${t.confirmados} confirmados de ${t.generados} generados`)}
       ${big("% Entrega", pct(t.pEnt), semaf(t.pEnt, .85, .7), `${t.entregados} entregados · ${t.devueltos} devueltos`)}
-      ${big("Beneficio (resultado)", eur(t.beneficio), t.beneficio > 0 ? "ok" : "bad", `Ingresos entregados ${eur(t.ingresos)}`)}
-      ${big("% Beneficio", pct(t.pBen), semaf(t.pBen, .2, .05), "Sobre el importe entregado")}
+      ${EQ ? big("% Devoluciones", pct(t.confirmados ? t.devueltos / t.confirmados : null), t.confirmados && t.devueltos / t.confirmados > .15 ? "bad" : "ok", "Sobre los confirmados") + kpi("Pedidos generados", t.generados, `${t.confirmados} confirmados · ${t.entregados} entregados`)
+        : big("Beneficio (resultado)", eur(t.beneficio), t.beneficio > 0 ? "ok" : "bad", `Ingresos entregados ${eur(t.ingresos)}`) + big("% Beneficio", pct(t.pBen), semaf(t.pBen, .2, .05), "Sobre el importe entregado")}
     </div>
-    <div class="grid" style="margin-top:12px">
+    ${EQ ? "" : `<div class="grid" style="margin-top:12px">
       ${kpi("Ventas generadas", eur(t.ventas), `${t.generados} pedidos`)}
       ${kpi("Gasto en publicidad", eur(t.inversion), `ROAS real ${x2(t.roas)} · CPA entregado ${eur(t.cpa)}`)}
       ${kpi("Producto + logística", eur(t.costes), "Producto, envío, picking, COD y financiero")}
-    </div>
-    <p class="hint">El % de entrega de los últimos días sube a medida que llegan los pedidos (marcados «en curso»). Si un día no tiene gasto de publicidad en el Sheet, su beneficio aparece sin descontarlo.</p>` +
+    </div>`}
+    <p class="hint">El % de entrega de los últimos días sube a medida que llegan los pedidos (marcados «en curso»).${EQ ? "" : " Si un día no tiene gasto de publicidad en el Sheet, su beneficio aparece sin descontarlo."}</p>` +
     table("bee", [
       { k: "fecha", label: "Fecha", h: r => fdate(r.fecha) + (r.fecha >= hace7 ? ` <span class="hint">en curso</span>` : "") },
       { k: "generados", label: "Generados", num: 1 }, { k: "confirmados", label: "Confirm.", num: 1 },
@@ -705,7 +712,7 @@ views.logistica = () => {
       { k: "costes", label: "Costes", num: 1, h: r => eur(r.costes) },
       { k: "ben", label: "Beneficio", num: 1, v: r => r.ingresos - r.costes - r.inversion, h: r => { const b = r.ingresos - r.costes - r.inversion; return `<b style="color:var(--${b >= 0 ? "ok" : "bad"})">${eur(b)}</b>`; } },
       { k: "pBen", label: "% Benef.", num: 1, v: r => r.ingresos ? (r.ingresos - r.costes - r.inversion) / r.ingresos : null, h: r => pct(r.ingresos ? (r.ingresos - r.costes - r.inversion) / r.ingresos : null) }
-    ], rows, beeping.rows.length ? "No hay días en este rango" : "Aún no hay datos de Beeping. Publica la pestaña Registro-Base del Sheet (ver README).");
+    ].filter(c => !EQ || !["ventas", "ingresos", "inversion", "costes", "ben", "pBen"].includes(c.k)), rows, beeping.rows.length ? "No hay días en este rango" : "Aún no hay datos de Beeping. Publica la pestaña Registro-Base del Sheet (ver README).");
   } else if (tab === "conf") {
     const hace7 = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
     const stats = C.equipo.map(p => { const l = db.confirmaciones.filter(c => c.persona === p && c.fecha >= hace7);
@@ -857,6 +864,133 @@ views.ajustes.bind = () => {
   };
 };
 
+/* ----- Notas del equipo (observaciones, dudas y feedback) ----- */
+const TIPOS_NOTA = ["Observación", "Incidencia de pedido", "Idea / mejora", "Duda para Cristian"].concat(EQ ? [] : ["Feedback de Cristian"]);
+const TIPO_CLS = { "Observación": "info", "Incidencia de pedido": "bad", "Idea / mejora": "ok", "Duda para Cristian": "warn", "Feedback de Cristian": "brand" };
+const fechaHora = iso => iso ? new Date(iso).toLocaleString("es-ES", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+function notaCard(x) {
+  const mia = x.autor === me() || !EQ;
+  return `<div class="card" style="margin-bottom:10px;${x.fijada ? "border-left:4px solid var(--brand)" : ""}">
+    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><b style="color:var(--strong)">${esc(x.autor)}</b> <span class="pill ${TIPO_CLS[x.tipo] || ""}">${esc(x.tipo)}</span>${x.pedido ? ` <span class="hint">Pedido ${esc(x.pedido)}</span>` : ""}${x.fijada ? ` <span class="hint">📌 fijada</span>` : ""}</div>
+    <span class="hint">${fechaHora(x.fecha)}</span></div>
+    <div style="margin-top:6px;white-space:pre-wrap">${esc(x.texto)}</div>
+    ${x.respuesta ? `<div style="margin-top:8px;padding:8px 10px;background:var(--brand-soft);border-radius:8px"><b>${esc(x.respondidoPor || "")}</b> <span class="hint">${fechaHora(x.respondidoEn)}</span><div style="white-space:pre-wrap">${esc(x.respuesta)}</div></div>` : ""}
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn sm sec" data-nresp="${x.id}">${x.respuesta ? "Editar respuesta" : "Responder"}</button>
+    ${mia ? `<button class="btn sm sec" data-nedit="${x.id}">Editar</button><button class="btn sm danger" data-ndel="${x.id}">Borrar</button>` : ""}
+    ${!EQ ? `<button class="btn sm sec" data-nfix="${x.id}">${x.fijada ? "Desfijar" : "📌 Fijar"}</button>` : ""}</div></div>`;
+}
+function notasView() {
+  const f = ui.filters.notas || (ui.filters.notas = { tipo: "", autor: "" });
+  const l = db.notas.filter(x => (!f.tipo || x.tipo === f.tipo) && (!f.autor || x.autor === f.autor))
+    .sort((a, b) => (b.fijada ? 1 : 0) - (a.fijada ? 1 : 0) || (b.fecha || "").localeCompare(a.fecha || ""));
+  return `<div class="toolbar"><select id="fn-tipo"><option value="">Todos los tipos</option>${TIPOS_NOTA.concat(EQ ? ["Feedback de Cristian"] : []).map(t => `<option ${t === f.tipo ? "selected" : ""}>${t}</option>`).join("")}</select>
+    <select id="fn-autor"><option value="">Todo el equipo</option>${C.equipo.map(t => `<option ${t === f.autor ? "selected" : ""}>${t}</option>`).join("")}</select>
+    <span class="hint">Observaciones del día, pedidos con algo raro, ideas y dudas para Cristian. Cristian responde aquí mismo.</span><span class="grow"></span><button class="btn" id="new-nota">+ Nota</button></div>
+    ${l.length ? l.map(notaCard).join("") : `<div class="card empty">Todavía no hay notas</div>`}`;
+}
+function editNota(rec) {
+  openForm(rec ? "Editar nota" : "Nueva nota", [
+    { k: "tipo", label: "Tipo", type: "select", opts: TIPOS_NOTA, def: "Observación" }, { k: "pedido", label: "Nº de pedido (opcional)", ph: "#7393" },
+    { k: "texto", label: "Nota", type: "textarea", full: 1 }], rec, r => save("notas", { ...r, autor: r.autor || me(), fecha: r.fecha || new Date().toISOString() }));
+}
+function responderNota(x) {
+  openForm("Responder", [{ k: "respuesta", label: `Respuesta a ${x.autor}`, type: "textarea", full: 1 }], x,
+    r => save("notas", { ...r, respondidoPor: me(), respondidoEn: new Date().toISOString() }));
+}
+document.addEventListener("click", async e => {
+  const t = e.target.closest("button"); if (!t) return; const d = t.dataset;
+  if (t.id === "new-nota") editNota();
+  if (d.nedit) editNota(db.notas.find(x => x.id === d.nedit));
+  if (d.nresp) responderNota(db.notas.find(x => x.id === d.nresp));
+  if (d.ndel) armDelete(t, async () => { await remove("notas", d.ndel); render(); });
+  if (d.nfix) { const x = db.notas.find(y => y.id === d.nfix); x.fijada = !x.fijada; await save("notas", x); render(); }
+});
+document.addEventListener("change", e => {
+  if (e.target.id === "fn-tipo") { ui.filters.notas.tipo = e.target.value; render(); }
+  if (e.target.id === "fn-autor") { ui.filters.notas.autor = e.target.value; render(); }
+});
+
+/* ----- Mi panel (equipo logístico) ----- */
+const OBJ = C.objetivos || { conf: 0.75, entrega: 0.85, devol: 0.15, sinMotivo: 0.3 };
+function semanas(n) {
+  const out = [], lunes = d => { const x = new Date(d); const w = (x.getDay() + 6) % 7; x.setDate(x.getDate() - w); return x; };
+  let ini = lunes(new Date());
+  for (let i = 0; i < n; i++) {
+    const a = new Date(ini); a.setDate(a.getDate() - 7 * i); const b = new Date(a); b.setDate(b.getDate() + 6);
+    const A = a.toLocaleDateString("sv-SE"), B = b.toLocaleDateString("sv-SE");
+    out.push({ desde: A, hasta: B, t: aggBeeping(beeping.rows.filter(r => r.fecha >= A && r.fecha <= B)), enCurso: i < 2 });
+  }
+  return out;
+}
+views.mipanel = () => {
+  const yo = me(), dIso = k => new Date(Date.now() - k * 864e5).toISOString().slice(0, 10);
+  const b7 = aggBeeping(beeping.rows.filter(r => r.fecha >= dIso(6)));
+  const bc = aggBeeping(beeping.rows.filter(r => r.fecha >= dIso(13) && r.fecha <= dIso(7)));
+  const bp = aggBeeping(beeping.rows.filter(r => r.fecha >= dIso(20) && r.fecha <= dIso(14)));
+  const bd = aggBeeping(beeping.rows.filter(r => r.fecha >= dIso(41) && r.fecha <= dIso(14)));   // las devoluciones tardan semanas en registrarse
+  const devol = bd.confirmados ? bd.devueltos / bd.confirmados : null;
+  const inc = db.sistema.find(x => x.id === "inc_resumen"), mot = db.sistema.find(x => x.id === "motivos");
+  const canc = mot ? (mot.registros || []).filter(r => r.tipo === "cancelado") : [];
+  const sinMot = canc.length ? canc.filter(r => r.categoria.startsWith("Ya no lo quiere")).length / canc.length : null;
+  const sh = db.sistema.find(x => x.id === "shopify"), hoyISO = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
+  const sHoy = sh && (sh.dias || []).find(d => d.fecha === hoyISO);
+  const misTar = db.tareas.filter(t => t.responsable === yo && t.estado !== "Hecha").sort((a, b) => (a.fecha || "9").localeCompare(b.fecha || "9"));
+  const vencidas = misTar.filter(t => t.fecha && t.fecha < today());
+  const regs = db.confirmaciones.filter(c => c.persona === yo && c.fecha >= dIso(6));
+  const fb = db.notas.filter(x => x.tipo === "Feedback de Cristian").sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")).slice(0, 3);
+  const misDudas = db.notas.filter(x => x.autor === yo && x.respuesta && x.respondidoEn && Date.now() - new Date(x.respondidoEn).getTime() < 7 * 864e5);
+  const flecha = (a, b) => a == null || b == null ? "" : a > b + .01 ? ` <span style="color:var(--ok)">▲ ${Math.round((a - b) * 100)} pts</span>` : a < b - .01 ? ` <span style="color:var(--bad)">▼ ${Math.round((b - a) * 100)} pts</span>` : ` <span class="hint">= igual</span>`;
+  const msgs = [];
+  if (b7.pConf != null) msgs.push(b7.pConf >= OBJ.conf ? ["ok", `Confirmación de los últimos 7 días: <b>${pct(b7.pConf)}</b>, por encima del objetivo (${pct(OBJ.conf)}). ¡Muy bien!`] : ["warn", `Confirmación de los últimos 7 días: <b>${pct(b7.pConf)}</b>, por debajo del objetivo (${pct(OBJ.conf)}). Insistid con una segunda llamada o WhatsApp a quien no contesta.`]);
+  if (bc.pEnt != null) msgs.push(bc.pEnt >= OBJ.entrega ? ["ok", `Entrega de la semana cerrada: <b>${pct(bc.pEnt)}</b>, objetivo cumplido.`] : ["warn", `Entrega de la semana cerrada: <b>${pct(bc.pEnt)}</b> (objetivo ${pct(OBJ.entrega)}). Revisad las incidencias antes de que Beeping las devuelva.`]);
+  if (inc) msgs.push(inc.sinGestionar ? ["bad", `Hay <b>${inc.sinGestionar} incidencias de Beeping sin gestionar</b>${inc.masAntigua ? `; la más antigua lleva ${inc.masAntigua} días` : ""}. Es lo primero de hoy.`] : ["ok", "Ninguna incidencia de Beeping sin gestionar. ¡Perfecto!"]);
+  if (sinMot != null && sinMot > OBJ.sinMotivo) msgs.push(["warn", `En el <b>${pct(sinMot)}</b> de las cancelaciones no consta el motivo real. Preguntad siempre «¿por qué ha cambiado de idea?» y anotadlo en la hoja.`]);
+  if (vencidas.length) msgs.push(["bad", `Tienes <b>${vencidas.length} tarea${vencidas.length > 1 ? "s" : ""} vencida${vencidas.length > 1 ? "s" : ""}</b>.`]);
+  if (misDudas.length) msgs.push(["info", `Cristian ha respondido ${misDudas.length} de tus notas esta semana. Míralas en Notas del equipo.`]);
+  const sem = semanas(6);
+  return `<h1>Hola, ${esc(yo)} 👋</h1><div class="sub">Así va el trabajo del equipo logístico. ${new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}</div>
+  ${fb.length ? `<div class="card" style="border-left:4px solid var(--brand)"><h3 style="margin:0 0 6px">💬 Feedback de Cristian</h3>${fb.map(x => `<div style="margin:6px 0"><span class="hint">${fechaHora(x.fecha)}</span><div style="white-space:pre-wrap">${esc(x.texto)}</div></div>`).join("")}</div>` : ""}
+  <div class="card"><h3 style="margin:0 0 6px">📣 Cómo vamos</h3>${msgs.map(([c, t]) => `<div style="display:flex;gap:8px;align-items:flex-start;margin:6px 0"><span class="pill ${c}" style="min-width:12px">&nbsp;</span><span>${t}</span></div>`).join("") || `<span class="hint">Sin datos todavía</span>`}</div>
+  <div class="grid">
+    ${kpi("Pedidos hoy", sHoy ? sHoy.pedidos : "—", sh ? `Shopify · actualizado ${new Date(sh.fecha).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}` : "")}
+    ${kpi("% Confirmación · 7 días", `<span class="pill ${semaf(b7.pConf, OBJ.conf, .6)}" style="font-size:20px">${pct(b7.pConf)}</span>`, `${b7.confirmados} de ${b7.generados} · objetivo ${pct(OBJ.conf)}`)}
+    ${kpi("% Entrega · semana cerrada", `<span class="pill ${semaf(bc.pEnt, OBJ.entrega, .7)}" style="font-size:20px">${pct(bc.pEnt)}</span>`, `${bc.entregados} de ${bc.confirmados}${flecha(bc.pEnt, bp.pEnt)} vs semana anterior`)}
+    ${kpi("% Devoluciones · 4 semanas", `<span class="pill ${devol == null ? "" : devol <= OBJ.devol ? "ok" : "bad"}" style="font-size:20px">${pct(devol)}</span>`, `${bd.devueltos} de ${bd.confirmados} confirmados · máximo ${pct(OBJ.devol)}`)}
+    ${kpi("Incidencias sin gestionar", inc ? `<span style="color:var(--${inc.sinGestionar ? "bad" : "ok"})">${inc.sinGestionar}</span>` : "—", inc ? `${inc.zombies || 0} abiertas con envío cerrado · ${inc.total} en total` : "Sincroniza Beeping en Incidencias")}
+    ${kpi("Tus tareas pendientes", misTar.length, vencidas.length ? `<span style="color:var(--bad)">${vencidas.length} vencidas</span>` : "Al día")}
+    ${kpi("Tu registro diario", `${regs.length} de 7 días`, "Confirmaciones apuntadas en el CRM")}
+  </div>
+  <h2>📈 Evolución por semanas</h2>${table("sem", [
+    { k: "desde", label: "Semana", h: w => `${fdate(w.desde)} – ${fdate(w.hasta)}${w.enCurso ? ` <span class="hint">en curso</span>` : ""}` },
+    { k: "gen", label: "Pedidos", num: 1, h: w => w.t.generados }, { k: "conf", label: "Confirmados", num: 1, h: w => w.t.confirmados },
+    { k: "pConf", label: "% Confirmación", num: 1, h: w => `<span class="pill ${semaf(w.t.pConf, OBJ.conf, .6)}">${pct(w.t.pConf)}</span>` },
+    { k: "ent", label: "Entregados", num: 1, h: w => w.t.entregados },
+    { k: "pEnt", label: "% Entrega", num: 1, h: w => `<span class="pill ${semaf(w.t.pEnt, OBJ.entrega, .7)}">${pct(w.t.pEnt)}</span>` },
+    { k: "dev", label: "Devueltos", num: 1, h: w => w.t.devueltos }], sem.filter(w => w.t.generados))}
+  <div class="two">
+    <div><h2>✅ Tus tareas</h2>${misTar.length ? misTar.map(t => `<div class="card" style="margin-bottom:8px;padding:10px 12px"><b style="color:var(--strong)">${esc(t.titulo)}</b> <span class="pill ${{ Alta: "bad", Media: "warn", Baja: "info" }[t.prioridad] || ""}">${esc(t.prioridad || "")}</span><div class="hint">${t.fecha ? (t.fecha < today() ? `<span style="color:var(--bad)">venció ${fdate(t.fecha)}</span>` : "para " + fdate(t.fecha)) : "sin fecha"} · ${esc(t.estado || "Pendiente")}</div></div>`).join("") : `<div class="card empty">No tienes tareas pendientes 🎉</div>`}</div>
+    <div><h2>📝 Últimas notas</h2>${db.notas.slice().sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")).slice(0, 4).map(notaCard).join("") || `<div class="card empty">Sin notas todavía</div>`}
+      <button class="btn" id="new-nota">+ Nota u observación</button></div>
+  </div>`;
+};
+
+/* ----- PIN del CRM completo (el panel del equipo no lo pide) ----- */
+async function sha256(t) { const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join(""); }
+function pedirPin() {
+  return new Promise(res => {
+    if (EQ || !C.pinHash || localStorage.getItem("crm_pin") === C.pinHash) return res();
+    const ov = document.createElement("div");
+    ov.style.cssText = "position:fixed;inset:0;background:var(--side);z-index:100;display:flex;align-items:center;justify-content:center";
+    ov.innerHTML = `<div class="card" style="width:320px;text-align:center"><h2 style="margin-top:0">🔒 Aurialo CRM</h2><p class="hint">Introduce el PIN de acceso</p>
+      <input id="pin-in" type="password" inputmode="numeric" style="width:100%;text-align:center;font-size:22px;letter-spacing:6px" autofocus>
+      <div id="pin-err" class="hint" style="color:var(--bad);min-height:18px;margin-top:6px"></div><button class="btn" id="pin-ok" style="width:100%">Entrar</button>
+      <p class="hint" style="margin-top:12px">¿Eres del equipo logístico? Entra en <a href="/equipo">aurialo.netlify.app/equipo</a></p></div>`;
+    document.body.appendChild(ov);
+    const go = async () => { if (await sha256($("#pin-in").value.trim()) === C.pinHash) { localStorage.setItem("crm_pin", C.pinHash); ov.remove(); res(); } else { $("#pin-err").textContent = "PIN incorrecto"; $("#pin-in").value = ""; } };
+    $("#pin-ok").onclick = go; $("#pin-in").onkeydown = e => { if (e.key === "Enter") go(); };
+  });
+}
+
 /* ---------- acciones delegadas ---------- */
 document.addEventListener("click", async e => {
   const t = e.target.closest("button,a"); if (!t || !t.dataset) return;
@@ -883,6 +1017,7 @@ document.addEventListener("click", async e => {
 /* ---------- render y arranque ---------- */
 function banner() {
   const w = new Date().getDay(); const p = [];
+  if (EQ) { $("#banner").innerHTML = ""; return; }
   if ([1, 3, 5].includes(w)) p.push(`<span class="pill info">📊 Hoy toca reporte de creativos</span>`);
   if ([2, 4].includes(w)) p.push(`<span class="pill ok">🚀 Día de lanzamiento de creativos</span>`);
   if ([5, 6, 0].includes(w)) p.push(`<span class="pill warn">✋ No escalar ni pausar conjuntos (viernes a domingo)</span>`);
@@ -894,12 +1029,18 @@ function render() {
   $("#view").innerHTML = views[ui.view]();
   views[ui.view].bind && views[ui.view].bind();
 }
+const NAV = EQ ? [["mipanel", "🏠 Mi panel"], ["logistica", "📦 Logística"]]
+  : [["panel", "📊 Panel"], ["meta", "📈 Meta Ads"], ["creativo", "🎬 Director creativo"], ["logistica", "📦 Equipo logístico"], ["competencia", "🔎 Competencia"], ["ajustes", "⚙️ Ajustes"]];
+$("#nav").innerHTML = NAV.map(([k, l]) => `<button data-view="${k}">${l}</button>`).join("");
+if (EQ) { ui.view = "mipanel"; document.title = "Aurialo · Equipo logístico"; document.querySelector(".brand").innerHTML = '<span class="dot"></span>Aurialo <b>Logística</b>'; }
 $("#nav").onclick = e => { const b = e.target.closest("button"); if (b) { ui.view = b.dataset.view; location.hash = ui.view; render(); } };
+if (EQ && !localStorage.getItem("crm_yo")) localStorage.setItem("crm_yo", C.equipo.find(p => p !== "Cristian") || C.equipo[0]);
 $("#yo").innerHTML = C.equipo.map(p => `<option ${p === me() ? "selected" : ""}>${p}</option>`).join("");
 $("#yo").onchange = e => { localStorage.setItem("crm_yo", e.target.value); render(); };
 
 (async () => {
-  if (views[location.hash.slice(1)]) ui.view = location.hash.slice(1);
+  await pedirPin();
+  const h = location.hash.slice(1); if (views[h] && NAV.some(([k]) => k === h)) ui.view = h;
   await load();
   await loadBeeping();
   if (online && !db.competidores.length && !db.sistema.some(s => s.id === "seed")) {

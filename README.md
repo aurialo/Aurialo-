@@ -67,3 +67,10 @@ Los datos llegan con un **marcador de Chrome** que se ejecuta en `newapp.gobeepi
 ## Motivos de rechazo
 
 `scripts/motivos_sync.py` clasifica las observaciones del Sheet **PEDIDOS E INCIDENCIAS** (pestañas Pedidos cancelados, Incidencias devueltas, Carritos recuperados y Pedidos confirmados) en motivos: ya no lo quiere (sin motivo), no contactable, sin dinero, desconfianza, consejo médico, duplicado, error, cambio de circunstancias y devuelto automático por Beeping. También marca si el cliente rechazó el descuento. El resultado se ve en Equipo logístico → Motivos de rechazo. Un agente programado («Motivos de rechazo») lee el Sheet cada día, ejecuta el script y deja un resumen.
+
+## Panel del equipo logístico y PIN
+
+- **aurialo.netlify.app/equipo** es el panel de Florencia y Mayra: «Mi panel» (KPIs con objetivos, feedback automático, evolución por semanas, sus tareas y notas) y «Logística» (resultados de Beeping sin datos de dinero, motivos de rechazo, confirmaciones, incidencias, tareas y notas). No pide PIN.
+- **Notas del equipo**: observaciones, incidencias de pedidos, ideas y dudas para Cristian. Cristian responde desde el CRM (Equipo logístico → Notas del equipo) y puede dejar «Feedback de Cristian», que aparece arriba en el panel del equipo. Las dudas sin responder salen en Panel → Hoy.
+- **El CRM completo** pide un PIN (hash en `config.js` → `pinHash`). Es un cierre sencillo para separar accesos, no una seguridad fuerte: los datos siguen en una base compartida.
+- Los objetivos del equipo están en `config.js` → `objetivos`.

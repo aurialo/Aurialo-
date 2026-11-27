@@ -17,6 +17,13 @@ window.AURIALO_CONFIG = {
 
   equipo: ["Cristian", "Florencia", "Mayra"],
 
+  // PIN del CRM completo (SHA-256). El panel del equipo (/equipo) no lo pide.
+  // Para cambiarlo: pon aquí el SHA-256 del PIN nuevo (te lo calcula Claude).
+  pinHash: "9b18e9f2b8f335ddfe66ef2e2abeed87127225cbe555b91745c2b25ade970b6b",
+
+  // Objetivos del equipo logístico (panel /equipo)
+  objetivos: { conf: 0.75, entrega: 0.85, devol: 0.15, sinMotivo: 0.30 },
+
   // Economía por producto (calculada el 26/11/2026 con los pedidos de Beeping del 27/10 al 16/11:
   // ticket medio, unidades por pedido, coste unitario y costes logísticos del Sheet contable).
   // cpaMax / roasBE: por pedido generado (lo que mide Meta). cpaObj / roasObj: dejando un 20 % de beneficio.

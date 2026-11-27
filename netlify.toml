@@ -16,3 +16,8 @@
   for = "/*.css"
   [headers.values]
     Cache-Control = "no-cache"
+
+[[redirects]]
+  from = "/equipo"
+  to = "/equipo.html"
+  status = 200

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aurialo · Equipo logístico</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script>window.CRM_MODO = "equipo";</script>
+<script src="config.js"></script>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>Aurialo <b>CRM</b></div>
+    <nav id="nav">
+      <button data-view="panel" class="active">📊 Panel</button>
+      <button data-view="meta">📈 Meta Ads</button>
+      <button data-view="creativo">🎬 Director creativo</button>
+      <button data-view="logistica">📦 Equipo logístico</button>
+      <button data-view="competencia">🔎 Competencia</button>
+      <button data-view="ajustes">⚙️ Ajustes</button>
+    </nav>
+    <div class="me">
+      <label>Estás como</label>
+      <select id="yo"></select>
+      <div id="sync" class="sync">Conectando…</div>
+    </div>
+  </aside>
+  <main>
+    <div id="banner" class="banner"></div>
+    <section id="view"></section>
+  </main>
+</div>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="modal-title"></h3><button class="x" id="modal-close">✕</button></div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
