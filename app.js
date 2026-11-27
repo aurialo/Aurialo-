@@ -218,6 +218,7 @@ function veredicto(k) {
   if (k.dias != null && k.dias < R.diasMinimos) return "En test";
   if (k.gasto < R.gastoMinimo && k.compras === 0) return (k.dias != null && k.dias >= 7) ? "Sin datos" : "En test";
   if (k.compras === 0 && k.gasto >= R.gastoSinVentas) return "No relanzar";
+  if (k.compras === 0) return "Vigilar";
   if (k.compras >= R.comprasGanador && k.roas >= R.roasGanador) return "Ganador";
   if (k.roas >= R.roasPrometedor) return "Prometedor";
   if (k.roas != null && k.roas < R.roasDescartar) return "No relanzar";
@@ -237,7 +238,79 @@ const vpill = v => `<span class="pill ${VCLS[v] || ""}">${esc(v)}</span>`;
 /* ---------- vistas ---------- */
 const views = {};
 
-views.panel = () => {
+const PRINC = ["GLP1", "MENO", "DRENAJE"];
+const prodPill = code => code ? `<span class="pill brand">${esc(prodName(code))}</span>` : `<span class="hint">—</span>`;
+/* Clasificación del día para anuncios activos en Meta (si el agente no ha dejado sus acciones) */
+function accionesCalculadas() {
+  const act = db.creativos.filter(r => r.estadoMeta === "ACTIVE" && n(r.gasto) >= 1).map(r => ({ r, k: m(r) }));
+  const out = { escalar: [], apagar: [], sano: [], vigilar: [] };
+  act.forEach(x => {
+    const rt = rentab(x), v = x.k.veredicto;
+    const it = { nombre: x.r.nombre, producto: x.r.producto, conjunto: x.r.conjunto, gasto: x.k.gasto, compras: x.k.compras, roas: x.k.roas, cpa: x.k.cpa };
+    if (v === "No relanzar" || (rt.o === 1 && x.k.gasto >= C.reglas.gastoSinVentas)) out.apagar.push({ ...it, motivo: rt.o === 1 ? `CPA ${eur(x.k.cpa)} por encima del máximo del producto` : (x.k.compras ? `ROAS ${x2(x.k.roas)} muy bajo` : `${eur(x.k.gasto)} gastados sin ventas`) });
+    else if (v === "Ganador" && rt.o === 3) out.escalar.push({ ...it, motivo: `${x.k.compras} compras y CPA ${eur(x.k.cpa)} dentro del objetivo` });
+    else if (rt.o >= 2 || v === "Ganador" || v === "Prometedor") out.sano.push({ ...it, motivo: rt.o === 3 ? "Rentable con margen; faltan compras para escalar" : rt.o === 2 ? "Rentable, pero sin el 20 % de margen" : "Buenas señales" });
+    else out.vigilar.push({ ...it, motivo: v === "En test" || v === "Sin datos" ? "Aún sin datos suficientes" : (rt.o === 1 ? `CPA ${eur(x.k.cpa)} por encima del máximo` : "Resultados flojos: revisar en 48 h") });
+  });
+  Object.values(out).forEach(l => l.sort((a, b) => b.gasto - a.gasto));
+  return out;
+}
+function listaAccion(items, vacio) {
+  if (!items || !items.length) return `<div class="hint" style="padding:8px 0">${vacio}</div>`;
+  return items.slice(0, 12).map(i => `<div style="border-top:1px solid var(--line);padding:8px 0">
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b style="color:var(--strong);font-size:13px">${esc(i.nombre || i.conjunto || "")}</b> ${prodPill(i.producto)}</div>
+    ${i.conjunto && i.nombre ? `<div class="hint">${esc(i.conjunto)}</div>` : ""}
+    <div class="hint">${[i.gasto != null ? eur(n(i.gasto)) : "", i.compras != null ? `${i.compras} compras` : "", i.roas ? `ROAS ${x2(n(i.roas))}` : "", i.cpa ? `CPA ${eur(n(i.cpa))}` : ""].filter(Boolean).join(" · ")}</div>
+    ${i.motivo ? `<div style="font-size:12.5px;margin-top:2px">${esc(i.motivo)}</div>` : ""}</div>`).join("") + (items.length > 12 ? `<div class="hint">…y ${items.length - 12} más</div>` : "");
+}
+function panelHoy() {
+  const w = new Date().getDay(), finde = [5, 6, 0].includes(w);
+  const ag = db.sistema.find(x => x.id === "acciones");
+  const agReciente = ag && Date.now() - new Date(ag.fecha).getTime() < 3.5 * 864e5;
+  const A = agReciente ? { escalar: ag.escalar || [], apagar: ag.apagar || [], sano: ag.sano || [], vigilar: [...(ag.esperar || []), ...(ag.vigilar || [])], iterar: ag.iterar || [] } : { ...accionesCalculadas(), iterar: [] };
+  const fuente = agReciente ? `Según el agente <b>Analíticas Meta Ads</b> · ${new Date(ag.fecha).toLocaleString("es-ES", { weekday: "long", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}${ag.titular ? " · " + esc(ag.titular) : ""}` : "Calculado con los anuncios activos en Meta y el CPA máximo de cada producto (datos acumulados de cada anuncio)";
+  const dIso = k => new Date(Date.now() - k * 864e5).toISOString().slice(0, 10);
+  const b7 = aggBeeping(beeping.rows.filter(r => r.fecha >= dIso(6)));
+  const bc = aggBeeping(beeping.rows.filter(r => r.fecha >= dIso(13) && r.fecha <= dIso(7)));
+  const ayer = aggBeeping(beeping.rows.filter(r => r.fecha === dIso(1)));
+  const inc = db.sistema.find(x => x.id === "inc_resumen");
+  const mot = db.sistema.find(x => x.id === "motivos");
+  const comp = db.sistema.find(x => x.id === "competencia");
+  const tar = db.tareas.filter(t => t.estado !== "Hecha").sort((a, b) => (a.fecha || "9").localeCompare(b.fecha || "9"));
+  const listos = db.produccion.filter(p => p.estado === "Listo");
+  const incMan = db.incidencias.filter(i => i.estado === "Abierta");
+  const dia = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+  const pendientes = [];
+  if (inc && inc.sinGestionar) pendientes.push(`<b style="color:var(--bad)">${inc.sinGestionar}</b> incidencias de Beeping sin gestionar${inc.masAntigua ? ` (la más antigua lleva ${inc.masAntigua} días)` : ""} → <a href="#logistica" data-goinc="1">Incidencias</a>`);
+  if (inc && inc.zombies) pendientes.push(`${inc.zombies} incidencias abiertas en Beeping con el envío ya cerrado: cerrarlas`);
+  if (incMan.length) pendientes.push(`${incMan.length} incidencias del registro manual abiertas`);
+  if (listos.length) pendientes.push(`${listos.length} creativos listos para lanzar (${listos.slice(0, 3).map(p => esc(nombreCreativo(p))).join(", ")}${listos.length > 3 ? "…" : ""})`);
+  if ([2, 4].includes(w) && !listos.length) pendientes.push("Hoy es día de lanzamiento y no hay creativos en «Listo»");
+  tar.slice(0, 6).forEach(t => pendientes.push(`Tarea: ${esc(t.titulo)} <span class="hint">· ${esc(t.responsable || "")}${t.fecha ? " · " + fdate(t.fecha) : ""}${t.prioridad === "Alta" ? " · <b style='color:var(--bad)'>alta</b>" : ""}</span>`));
+  if (!agReciente) pendientes.push(`El agente Analíticas Meta Ads aún no ha dejado sus recomendaciones (sale lunes, miércoles y viernes a las 9:38)`);
+  const col = (titulo, cls, items, vacio, nota) => `<div class="card" style="margin:0;border-top:4px solid var(--${cls})"><h3 style="margin:0">${titulo} <span class="hint">${(items || []).length}</span></h3>${nota ? `<div class="hint" style="margin:2px 0 4px">${nota}</div>` : ""}${listaAccion(items, vacio)}</div>`;
+  return `<h1>Hoy · ${esc(dia)}</h1><div class="sub">Qué hacer hoy, lo pendiente y cómo va la tienda.</div>
+  <div class="card"><h3 style="margin:0 0 10px">🏪 Resumen de la tienda</h3><div class="grid">
+    ${kpi("Ayer", `${ayer.generados} pedidos`, `${ayer.confirmados} confirmados · ventas ${eur(ayer.ventas)} · publicidad ${eur(ayer.inversion)}`)}
+    ${kpi("% Confirmación · 7 días", `<span class="pill ${semaf(b7.pConf, .75, .6)}" style="font-size:20px">${pct(b7.pConf)}</span>`, `${b7.confirmados} de ${b7.generados} pedidos`)}
+    ${kpi("% Entrega · semana cerrada", `<span class="pill ${semaf(bc.pEnt, .85, .7)}" style="font-size:20px">${pct(bc.pEnt)}</span>`, `${fdate(dIso(13))}–${fdate(dIso(7))}`)}
+    ${kpi("Beneficio · semana cerrada", `<span style="color:var(--${bc.beneficio >= 0 ? "ok" : "bad"})">${eur(bc.beneficio)}</span>`, `${pct(bc.pBen)} sobre lo entregado`)}
+  </div>
+  ${mot && (mot.resumen || []).length ? `<div style="margin-top:10px;font-size:13px">🗣️ <b>Por qué no quieren el pedido:</b> ${esc(mot.resumen[0])}</div>` : ""}
+  ${comp && (comp.acciones || []).length ? `<div style="margin-top:6px;font-size:13px">🔎 <b>Competencia, a probar esta semana:</b> ${esc(comp.acciones[0])}</div>` : ""}
+  </div>
+  ${finde ? `<div class="card" style="background:var(--warn-soft);border-color:transparent">✋ <b>Viernes a domingo no se escala ni se pausa.</b> Lo de «Escalar» y «Parar» queda apuntado para el lunes.</div>` : ""}
+  <div class="hint" style="margin:6px 0 8px">${fuente}</div>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr));align-items:start">
+    ${col("🚀 Escalar", "ok", A.escalar, "Nada que escalar hoy", finde ? "Para el lunes · +20–25 % cada 48–72 h" : "+20–25 % de presupuesto, máximo cada 48–72 h")}
+    ${col("⛔ Parar", "bad", A.apagar, "Nada que parar", finde ? "Para el lunes" : "")}
+    ${col("✅ Sano", "info", A.sano, "Sin anuncios en esta situación", "Mantener como está")}
+    ${col("👀 Vigilar", "warn", A.vigilar, "Nada que vigilar", "Sin decisión todavía")}
+  </div>
+  ${A.iterar.length ? `<div class="card" style="margin-top:14px"><h3 style="margin:0">🔁 Iterar: sacar 2–3 variaciones de hook</h3>${listaAccion(A.iterar, "")}</div>` : ""}
+  <div class="card" style="margin-top:14px"><h3 style="margin:0 0 6px">📋 Pendiente y novedades</h3>${pendientes.length ? `<ul class="rules">${pendientes.map(p => `<li>${p}</li>`).join("")}</ul>` : `<div class="hint">Nada pendiente 🎉</div>`}</div>`;
+}
+function panelKpis() {
   const cr = db.creativos.map(r => ({ r, k: m(r) }));
   const gasto = cr.reduce((a, x) => a + x.k.gasto, 0), ing = cr.reduce((a, x) => a + x.k.ingresos, 0), comp = cr.reduce((a, x) => a + x.k.compras, 0);
   const count = v => cr.filter(x => x.k.veredicto === v).length;
@@ -247,13 +320,30 @@ views.panel = () => {
   const hace7 = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
   const conf7 = db.confirmaciones.filter(c => c.fecha >= hace7);
   const cOk = conf7.reduce((a, c) => a + n(c.confirmados), 0), cTot = conf7.reduce((a, c) => a + n(c.confirmados) + n(c.cancelados) + n(c.noContesta), 0);
-  const top = cr.filter(x => x.k.compras > 0 && x.k.gasto >= C.reglas.gastoMinimo).sort((a, b) => n(b.k.roas) - n(a.k.roas)).slice(0, 5);
-  const malos = cr.filter(x => x.k.veredicto === "No relanzar").sort((a, b) => b.k.gasto - a.k.gasto).slice(0, 5);
   const dIso = k => new Date(Date.now() - k * 864e5).toISOString().slice(0, 10);
   const b7 = aggBeeping(beeping.rows.filter(r => r.fecha >= dIso(6)));
   const bc = aggBeeping(beeping.rows.filter(r => r.fecha >= dIso(13) && r.fecha <= dIso(7)));
   const bcTxt = `${fdate(dIso(13))}–${fdate(dIso(7))}`;
-  return `<h1>Panel</h1><div class="sub">Hola ${esc(me())}. Así va Aurialo hoy.</div>
+  const colsTop = [
+    { k: "nombre", label: "Creativo", v: x => x.r.nombre, h: x => `<span class="name">${esc(x.r.nombre)}</span>${x.r.conjunto ? `<div class="hint">${esc(x.r.conjunto)}</div>` : ""}` },
+    { k: "estadoMeta", label: "En Meta", v: x => x.r.estadoMeta || "", h: x => x.r.estadoMeta === "ACTIVE" ? `<span class="pill ok">Activo</span>` : `<span class="hint">Pausado</span>` },
+    { k: "formato", label: "Formato", v: x => x.r.formato || "—" },
+    { k: "gasto", label: "Gasto", num: 1, v: x => x.k.gasto, h: x => eur(x.k.gasto) },
+    { k: "compras", label: "Compras", num: 1, v: x => x.k.compras },
+    { k: "cpa", label: "CPA", num: 1, v: x => x.k.cpa, h: x => eur(x.k.cpa) },
+    { k: "roas", label: "ROAS", num: 1, v: x => x.k.roas, h: x => x2(x.k.roas) },
+    { k: "rent", label: "vs CPA máx.", v: x => rentab(x).o, h: x => { const r = rentab(x); return r.t ? `<span class="pill ${r.c}" title="${esc(r.tt)}">${r.t}</span>` : ""; } },
+    { k: "v", label: "Estado", v: x => x.k.veredicto, h: x => vpill(x.k.veredicto) }];
+  const porProd = PRINC.concat([...new Set(db.creativos.map(r => r.producto).filter(p => p && !PRINC.includes(p)))]).map(code => {
+    const l = cr.filter(x => x.r.producto === code && x.k.compras > 0 && x.k.gasto >= C.reglas.gastoMinimo).sort((a, b) => n(b.k.roas) - n(a.k.roas));
+    if (!l.length) return "";
+    const p = C.productos.find(q => q.code === code) || {};
+    const g = l.reduce((a, x) => a + x.k.gasto, 0), c = l.reduce((a, x) => a + x.k.compras, 0);
+    return `<h3 style="margin:18px 0 6px">${esc(prodName(code))} <span class="hint">· ${l.filter(x => rentab(x).o >= 2).length} de ${l.length} creativos con ventas son rentables${p.cpaMax ? ` · CPA máx. ${eur(p.cpaMax)} · ROAS breakeven ${x2(p.roasBE)}` : ""}</span></h3>` +
+      table("p-top-" + code, colsTop, l.slice(0, 8));
+  }).join("");
+  const malos = cr.filter(x => x.k.veredicto === "No relanzar").sort((a, b) => b.k.gasto - a.k.gasto).slice(0, 8);
+  return `<h1>KPIs</h1><div class="sub">Todos los indicadores de la tienda, Meta Ads y el equipo.</div>
   ${beeping.rows.length ? `<h2 style="margin-top:0">📦 Tienda (Beeping)</h2><div class="grid" style="margin-bottom:14px">
     ${kpi("% Confirmación · 7 días", `<span class="pill ${semaf(b7.pConf, .75, .6)}" style="font-size:20px">${pct(b7.pConf)}</span>`, `${b7.confirmados} de ${b7.generados} pedidos`)}
     ${kpi("% Entrega · semana cerrada", `<span class="pill ${semaf(bc.pEnt, .85, .7)}" style="font-size:20px">${pct(bc.pEnt)}</span>`, `${bc.entregados} de ${bc.confirmados} · ${bcTxt}`)}
@@ -270,20 +360,25 @@ views.panel = () => {
     ${kpi("Tareas pendientes", tarPend.length, C.equipo.map(p => `${p} ${tarPend.filter(t => t.responsable === p).length}`).join(" · "))}
     ${kpi("Confirmación 7 días", pct(cTot ? cOk / cTot : null), `${cOk} confirmados de ${cTot}`)}
   </div>
-  <div class="two">
-    <div><h2>🏆 Lo que funciona (top ROAS)</h2>${table("p-top", [
-      { k: "nombre", label: "Creativo", h: x => `<span class="name">${esc(x.r.nombre)}</span>` },
-      { k: "roas", label: "ROAS", num: 1, v: x => x.k.roas, h: x => x2(x.k.roas) },
-      { k: "cpa", label: "CPA", num: 1, v: x => x.k.cpa, h: x => eur(x.k.cpa) },
-      { k: "v", label: "Estado", h: x => vpill(x.k.veredicto) }], top, "Aún no hay creativos con ventas")}</div>
-    <div><h2>⛔ No volver a lanzar</h2>${table("p-bad", [
-      { k: "nombre", label: "Creativo", h: x => `<span class="name">${esc(x.r.nombre)}</span>` },
-      { k: "gasto", label: "Gasto", num: 1, h: x => eur(x.k.gasto) },
-      { k: "roas", label: "ROAS", num: 1, h: x => x2(x.k.roas) }], malos, "Nada descartado todavía")}</div>
-  </div>
-  <h2>📦 Incidencias abiertas</h2>${table("p-inc", [
+  <h2>🏆 Lo que funciona, por producto</h2><div class="hint">Creativos con ventas y al menos ${eur(C.reglas.gastoMinimo)} de gasto, ordenados por ROAS (métricas acumuladas de cada anuncio).</div>
+  ${porProd || `<div class="card empty">Aún no hay creativos con ventas</div>`}
+  <h2>⛔ No volver a lanzar</h2>${table("p-bad", [
+    { k: "nombre", label: "Creativo", h: x => `<span class="name">${esc(x.r.nombre)}</span>${x.r.conjunto ? `<div class="hint">${esc(x.r.conjunto)}</div>` : ""}` },
+    { k: "producto", label: "Producto", v: x => x.r.producto, h: x => prodPill(x.r.producto) },
+    { k: "gasto", label: "Gasto", num: 1, v: x => x.k.gasto, h: x => eur(x.k.gasto) },
+    { k: "compras", label: "Compras", num: 1, v: x => x.k.compras },
+    { k: "roas", label: "ROAS", num: 1, v: x => x.k.roas, h: x => x2(x.k.roas) }], malos, "Nada descartado todavía")}
+  <h2>📦 Incidencias abiertas (registro manual)</h2>${table("p-inc", [
     { k: "fecha", label: "Fecha", h: r => fdate(r.fecha) }, { k: "pedido", label: "Pedido" }, { k: "cliente", label: "Cliente" },
     { k: "tipo", label: "Tipo" }, { k: "estado", label: "Estado" }, { k: "responsable", label: "Responsable" }], incAb.slice(0, 8), "Sin incidencias abiertas 🎉")}`;
+}
+views.panel = () => {
+  const [tab, tabsHtml] = tabs("panel", [["hoy", "📌 Hoy"], ["kpis", "📊 KPIs"]]);
+  return tabsHtml + (tab === "hoy" ? panelHoy() : panelKpis());
+};
+views.panel.bind = () => {
+  const g = document.querySelector("[data-goinc]");
+  if (g) g.onclick = e => { e.preventDefault(); ui.view = "logistica"; ui.tabs.logistica = "inc"; location.hash = "logistica"; render(); };
 };
 
 /* ----- Meta Ads ----- */

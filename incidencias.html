@@ -282,6 +282,8 @@ function render() {
   const accion = rows.filter(r => r.c.accion), zombies = rows.filter(r => r.c.zombie);
   const retried = rows.filter(r => r.c.decision === 'reintento'), retriedClosed = retried.filter(r => r.c.fin !== 'curso'), retriedOk = retried.filter(r => r.c.fin === 'entregado');
   const errs = cnt(r => r.c.errs > 0 && r.c.fin === 'curso');
+  if (render._at !== DATA.at) { render._at = DATA.at; const res = { id: 'inc_resumen', fecha: new Date().toISOString(), datosDe: DATA.at, total: T, sinGestionar: accion.length, masAntigua: accion.length ? Math.floor(Math.max(...accion.map(r => r.c.age))) : 0, zombies: zombies.length, fallidas: errs, nuevas: newSet.size };
+    fetch(SB, { method: 'POST', headers: { ...HD, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([{ clave: 'crm:sistema:inc_resumen', valor: res, actualizado: res.fecha }]) }).catch(() => {}); }
   const deliveredAll = cnt(r => r.c.fin === 'entregado');
   let html = '';
   html += `<section><div class="sec-head"><h2>Qué requiere atención</h2><span class="muted" style="font-size:12.5px">Pulsa una tarjeta para filtrar la tabla</span></div><div class="alerts">
