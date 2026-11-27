@@ -272,7 +272,15 @@ function panelHoy() {
   const dIso = k => new Date(Date.now() - k * 864e5).toISOString().slice(0, 10);
   const b7 = aggBeeping(beeping.rows.filter(r => r.fecha >= dIso(6)));
   const bc = aggBeeping(beeping.rows.filter(r => r.fecha >= dIso(13) && r.fecha <= dIso(7)));
-  const ayer = aggBeeping(beeping.rows.filter(r => r.fecha === dIso(1)));
+  const sh = db.sistema.find(x => x.id === "shopify");
+  const shD = f => (sh && sh.dias || []).find(d => d.fecha === f);
+  const hoyISO = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
+  const ayerISO = new Date(Date.now() - 864e5).toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
+  const sHoy = shD(hoyISO), sAyer = shD(ayerISO);
+  const prev = (sh && sh.dias || []).filter(d => d.fecha < hoyISO).slice(-7);
+  const media = prev.length ? prev.reduce((a, d) => a + d.pedidos, 0) / prev.length : null;
+  const mix = d => d ? ["GLP1", "MENO", "DRENAJE", "UNPUFF"].filter(k => d.porProducto && d.porProducto[k] && d.porProducto[k].pedidos).map(k => `${d.porProducto[k].pedidos} ${({ GLP1: "GLP", MENO: "MENO", DRENAJE: "Drenaje", UNPUFF: "Unpuff" })[k]}`).join(" · ") : "";
+  const avisos = db.sistema.filter(x => String(x.id).startsWith("aviso_") && Date.now() - new Date(x.fecha).getTime() < 4 * 864e5).sort((a, b) => b.fecha.localeCompare(a.fecha));
   const inc = db.sistema.find(x => x.id === "inc_resumen");
   const mot = db.sistema.find(x => x.id === "motivos");
   const comp = db.sistema.find(x => x.id === "competencia");
@@ -291,14 +299,19 @@ function panelHoy() {
   const col = (titulo, cls, items, vacio, nota) => `<div class="card" style="margin:0;border-top:4px solid var(--${cls})"><h3 style="margin:0">${titulo} <span class="hint">${(items || []).length}</span></h3>${nota ? `<div class="hint" style="margin:2px 0 4px">${nota}</div>` : ""}${listaAccion(items, vacio)}</div>`;
   return `<h1>Hoy · ${esc(dia)}</h1><div class="sub">Qué hacer hoy, lo pendiente y cómo va la tienda.</div>
   <div class="card"><h3 style="margin:0 0 10px">🏪 Resumen de la tienda</h3><div class="grid">
-    ${kpi("Ayer", `${ayer.generados} pedidos`, `${ayer.confirmados} confirmados · ventas ${eur(ayer.ventas)} · publicidad ${eur(ayer.inversion)}`)}
+    ${kpi(`Pedidos hoy · Shopify`, sHoy ? `${sHoy.pedidos} pedidos` : "—", sHoy ? `${eur(sHoy.ventas)} · ${mix(sHoy)}${sh.ultimoPedido ? ` · último ${esc(sh.ultimoPedido.name)} a las ${new Date(sh.ultimoPedido.createdAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" })}` : ""}` : "Sin datos de hoy todavía")}
+    ${kpi("Ayer · Shopify", sAyer ? `${sAyer.pedidos} pedidos` : "—", sAyer ? `${eur(sAyer.ventas)} · ${mix(sAyer)}${sAyer.manuales ? ` · ${sAyer.manuales} manuales` : ""}${media ? ` · media 7 días ${String(media.toFixed(1)).replace(".", ",")}` : ""}` : "")}
     ${kpi("% Confirmación · 7 días", `<span class="pill ${semaf(b7.pConf, .75, .6)}" style="font-size:20px">${pct(b7.pConf)}</span>`, `${b7.confirmados} de ${b7.generados} pedidos`)}
     ${kpi("% Entrega · semana cerrada", `<span class="pill ${semaf(bc.pEnt, .85, .7)}" style="font-size:20px">${pct(bc.pEnt)}</span>`, `${fdate(dIso(13))}–${fdate(dIso(7))}`)}
     ${kpi("Beneficio · semana cerrada", `<span style="color:var(--${bc.beneficio >= 0 ? "ok" : "bad"})">${eur(bc.beneficio)}</span>`, `${pct(bc.pBen)} sobre lo entregado`)}
   </div>
+  ${sh ? `<div class="hint" style="margin-top:8px">Pedidos de Shopify actualizados ${new Date(sh.fecha).toLocaleString("es-ES", { weekday: "short", hour: "2-digit", minute: "2-digit" })}. Confirmación, entrega y beneficio salen de Beeping.</div>` : ""}
   ${mot && (mot.resumen || []).length ? `<div style="margin-top:10px;font-size:13px">🗣️ <b>Por qué no quieren el pedido:</b> ${esc(mot.resumen[0])}</div>` : ""}
   ${comp && (comp.acciones || []).length ? `<div style="margin-top:6px;font-size:13px">🔎 <b>Competencia, a probar esta semana:</b> ${esc(comp.acciones[0])}</div>` : ""}
   </div>
+  ${avisos.length ? `<div class="card"><h3 style="margin:0 0 8px">🤖 Lo que dicen los agentes</h3><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">${avisos.map(a => { const esHoy = new Date(a.fecha).toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" }) === hoyISO;
+    return `<div style="border:1px solid var(--line);border-radius:10px;padding:12px;${esHoy ? "border-left:4px solid var(--brand)" : "opacity:.8"}"><div style="display:flex;justify-content:space-between;gap:8px"><b style="color:var(--strong)">${esc(a.agente)}</b><span class="hint">${esHoy ? "hoy" : new Date(a.fecha).toLocaleDateString("es-ES", { weekday: "short", day: "2-digit" })} ${new Date(a.fecha).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</span></div>
+      ${a.titular ? `<div style="font-weight:600;margin:4px 0">${esc(a.titular)}</div>` : ""}<ul class="rules" style="margin:4px 0;padding-left:18px">${(a.puntos || []).slice(0, 6).map(p => `<li style="margin:3px 0">${esc(p)}</li>`).join("")}</ul>${a.enlace ? `<a href="${esc(a.enlace)}" target="_blank" rel="noopener" class="hint">Ver completo</a>` : ""}</div>`; }).join("")}</div></div>` : ""}
   ${finde ? `<div class="card" style="background:var(--warn-soft);border-color:transparent">✋ <b>Viernes a domingo no se escala ni se pausa.</b> Lo de «Escalar» y «Parar» queda apuntado para el lunes.</div>` : ""}
   <div class="hint" style="margin:6px 0 8px">${fuente}</div>
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr));align-items:start">
