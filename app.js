@@ -296,8 +296,6 @@ function panelHoy() {
   if (inc && inc.zombies) pendientes.push(`${inc.zombies} incidencias abiertas en Beeping con el envío ya cerrado: cerrarlas`);
   const dudas = db.notas.filter(x => x.tipo === "Duda para Cristian" && !x.respuesta);
   if (dudas.length) pendientes.push(`<b>${dudas.length}</b> duda${dudas.length > 1 ? "s" : ""} del equipo sin responder → Equipo logístico → Notas del equipo`);
-  const notasHoy = db.notas.filter(x => x.tipo !== "Feedback de Cristian" && x.fecha && Date.now() - new Date(x.fecha).getTime() < 864e5);
-  if (notasHoy.length) pendientes.push(`${notasHoy.length} nota${notasHoy.length > 1 ? "s" : ""} nueva${notasHoy.length > 1 ? "s" : ""} del equipo en las últimas 24 h`);
   if (incMan.length) pendientes.push(`${incMan.length} incidencias del registro manual abiertas`);
   if (listos.length) pendientes.push(`${listos.length} creativos listos para lanzar (${listos.slice(0, 3).map(p => esc(nombreCreativo(p))).join(", ")}${listos.length > 3 ? "…" : ""})`);
   if ([2, 4].includes(w) && !listos.length) pendientes.push("Hoy es día de lanzamiento y no hay creativos en «Listo»");
@@ -305,7 +303,11 @@ function panelHoy() {
   if (!EQ) proximosGastos(30).filter(x => x.d <= n(x.g.avisoDias ?? 4)).forEach(x => pendientes.push(`💸 <b>${esc(x.g.concepto)}</b> · ${eur(n(x.g.importe))} se cobra ${x.d < 0 ? `<b style="color:var(--bad)">(vencido hace ${-x.d} d, márcalo como pagado)</b>` : x.d === 0 ? "<b>hoy</b>" : x.d === 1 ? "<b>mañana</b>" : `en ${x.d} días (${fdate(x.f)})`} → <a href="#gastos">Gastos</a>`));
   if (!agReciente) pendientes.push(`El agente Analíticas Meta Ads aún no ha dejado sus recomendaciones (sale lunes, miércoles y viernes a las 8:03)`);
   const col = (titulo, cls, items, vacio, nota) => `<div class="card" style="margin:0;border-top:4px solid var(--${cls})"><h3 style="margin:0">${titulo} <span class="hint">${(items || []).length}</span></h3>${nota ? `<div class="hint" style="margin:2px 0 4px">${nota}</div>` : ""}${listaAccion(items, vacio)}</div>`;
+  const fb = feedbackPend();
+  const fbCard = fb.length ? `<div class="card" style="border-left:4px solid var(--brand);background:var(--brand-soft)"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0">💬 Feedback del equipo · ${fb.length} sin recoger</h3><span class="hint">Pulsa «✔ Recogido» cuando lo hayas leído o respondido. Todo el historial está en Equipo logístico → Notas del equipo.</span></div>
+    <div style="margin-top:10px">${fb.slice(0, 8).map(notaCard).join("")}${fb.length > 8 ? `<div class="hint">…y ${fb.length - 8} más en Notas del equipo</div>` : ""}</div></div>` : "";
   return `<h1>Hoy · ${esc(dia)}</h1><div class="sub">Qué hacer hoy, lo pendiente y cómo va la tienda.</div>
+  ${fbCard}
   <div class="card"><h3 style="margin:0 0 10px">🏪 Resumen de la tienda</h3><div class="grid">
     ${kpi(`Pedidos hoy · Shopify`, sHoy ? `${sHoy.pedidos} pedidos` : "—", sHoy ? `${eur(sHoy.ventas)} · ${mix(sHoy)}${sh.ultimoPedido ? ` · último ${esc(sh.ultimoPedido.name)} a las ${new Date(sh.ultimoPedido.createdAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" })}` : ""}` : "Sin datos de hoy todavía")}
     ${kpi("Ayer · Shopify", sAyer ? `${sAyer.pedidos} pedidos` : "—", sAyer ? `${eur(sAyer.ventas)} · ${mix(sAyer)}${sAyer.manuales ? ` · ${sAyer.manuales} manuales` : ""}${media ? ` · media 7 días ${String(media.toFixed(1)).replace(".", ",")}` : ""}` : "")}
@@ -1005,6 +1007,8 @@ views.ajustes.bind = () => {
 const TIPOS_NOTA = ["Observación", "Incidencia de pedido", "Idea / mejora", "Duda para Cristian"].concat(EQ ? [] : ["Feedback de Cristian"]);
 const TIPO_CLS = { "Observación": "info", "Incidencia de pedido": "bad", "Idea / mejora": "ok", "Duda para Cristian": "warn", "Feedback de Cristian": "brand" };
 const fechaHora = iso => iso ? new Date(iso).toLocaleString("es-ES", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+const feedbackPend = () => EQ ? [] : db.notas.filter(x => (x.tipo !== "Feedback de Cristian" && x.autor !== "Cristian" && !x.revisada) || (x.tipo === "Feedback de Cristian" && x.respuesta && x.respondidoPor !== "Cristian" && !x.revisada))
+  .sort((a, b) => (b.respondidoEn || b.fecha || "").localeCompare(a.respondidoEn || a.fecha || ""));
 function notaCard(x) {
   const mia = x.autor === me() || !EQ;
   return `<div class="card" style="margin-bottom:10px;${x.fijada ? "border-left:4px solid var(--brand)" : ""}">
@@ -1014,7 +1018,8 @@ function notaCard(x) {
     ${x.respuesta ? `<div style="margin-top:8px;padding:8px 10px;background:var(--brand-soft);border-radius:8px"><b>${esc(x.respondidoPor || "")}</b> <span class="hint">${fechaHora(x.respondidoEn)}</span><div style="white-space:pre-wrap">${esc(x.respuesta)}</div></div>` : ""}
     <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn sm sec" data-nresp="${x.id}">${x.respuesta ? "Editar respuesta" : "Responder"}</button>
     ${mia ? `<button class="btn sm sec" data-nedit="${x.id}">Editar</button><button class="btn sm danger" data-ndel="${x.id}">Borrar</button>` : ""}
-    ${!EQ ? `<button class="btn sm sec" data-nfix="${x.id}">${x.fijada ? "Desfijar" : "📌 Fijar"}</button>` : ""}</div></div>`;
+    ${!EQ ? `<button class="btn sm sec" data-nfix="${x.id}">${x.fijada ? "Desfijar" : "📌 Fijar"}</button>` : ""}
+    ${!EQ && x.autor !== "Cristian" || (!EQ && x.respuesta && x.respondidoPor !== "Cristian") ? (x.revisada ? `<span class="hint" style="align-self:center">✔ recogido</span>` : `<button class="btn sm" data-nrev="${x.id}">✔ Recogido</button>`) : ""}</div></div>`;
 }
 function notasView() {
   const f = ui.filters.notas || (ui.filters.notas = { tipo: "", autor: "" });
@@ -1028,11 +1033,11 @@ function notasView() {
 function editNota(rec) {
   openForm(rec ? "Editar nota" : "Nueva nota", [
     { k: "tipo", label: "Tipo", type: "select", opts: TIPOS_NOTA, def: "Observación" }, { k: "pedido", label: "Nº de pedido (opcional)", ph: "#7393" },
-    { k: "texto", label: "Nota", type: "textarea", full: 1 }], rec, r => save("notas", { ...r, autor: r.autor || me(), fecha: r.fecha || new Date().toISOString() }));
+    { k: "texto", label: "Nota", type: "textarea", full: 1 }], rec, r => save("notas", { ...r, autor: r.autor || me(), fecha: r.fecha || new Date().toISOString(), ...(EQ ? { revisada: false } : {}) }));
 }
 function responderNota(x) {
   openForm("Responder", [{ k: "respuesta", label: `Respuesta a ${x.autor}`, type: "textarea", full: 1 }], x,
-    r => save("notas", { ...r, respondidoPor: me(), respondidoEn: new Date().toISOString() }));
+    r => save("notas", { ...r, respondidoPor: me(), respondidoEn: new Date().toISOString(), revisada: !EQ }));
 }
 document.addEventListener("click", async e => {
   const t = e.target.closest("button"); if (!t) return; const d = t.dataset;
@@ -1040,6 +1045,7 @@ document.addEventListener("click", async e => {
   if (d.nedit) editNota(db.notas.find(x => x.id === d.nedit));
   if (d.nresp) responderNota(db.notas.find(x => x.id === d.nresp));
   if (d.ndel) armDelete(t, async () => { await remove("notas", d.ndel); render(); });
+  if (d.nrev) { const x = db.notas.find(y => y.id === d.nrev); x.revisada = true; x.revisadaEn = new Date().toISOString(); await save("notas", x); toast("✔ Feedback recogido"); render(); }
   if (d.nfix) { const x = db.notas.find(y => y.id === d.nfix); x.fijada = !x.fijada; await save("notas", x); render(); }
 });
 document.addEventListener("change", e => {
@@ -1163,6 +1169,7 @@ function banner() {
 function render() {
   banner();
   document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("active", b.dataset.view === ui.view));
+  const pb = document.querySelector('#nav button[data-view="panel"]'); if (pb) { const k = feedbackPend().length; pb.innerHTML = `📊 Panel${k ? ` <span style="background:#e11d48;color:#fff;border-radius:10px;padding:0 7px;font-size:11px;margin-left:4px" title="Feedback del equipo sin recoger">${k}</span>` : ""}`; }
   $("#view").innerHTML = views[ui.view]();
   views[ui.view].bind && views[ui.view].bind();
 }
