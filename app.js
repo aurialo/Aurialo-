@@ -3,8 +3,8 @@
    Si Supabase no responde, trabaja en local (localStorage) y avisa. */
 (() => {
 const C = window.AURIALO_CONFIG;
-const COLS = ["creativos", "produccion", "confirmaciones", "incidencias", "tareas", "competidores", "anuncios", "sistema", "notas"];
 const EQ = window.CRM_MODO === "equipo";
+const COLS = ["creativos", "produccion", "confirmaciones", "incidencias", "tareas", "competidores", "anuncios", "sistema", "notas"].concat(EQ ? [] : ["gastos"]);
 const OBJ = Object.assign({ conf: 0.78, confTop: 0.80, confAviso: 0.70, entrega: 0.85, devol: 0.15, sinMotivo: 0.3 }, C.objetivos || {});
 const objConf = () => `${Math.round(OBJ.conf * 100)}–${Math.round(OBJ.confTop * 100)} %`;   // panel del equipo logístico: solo logística y sin datos de dinero
 const db = Object.fromEntries(COLS.map(c => [c, []]));
@@ -302,7 +302,8 @@ function panelHoy() {
   if (listos.length) pendientes.push(`${listos.length} creativos listos para lanzar (${listos.slice(0, 3).map(p => esc(nombreCreativo(p))).join(", ")}${listos.length > 3 ? "…" : ""})`);
   if ([2, 4].includes(w) && !listos.length) pendientes.push("Hoy es día de lanzamiento y no hay creativos en «Listo»");
   tar.slice(0, 6).forEach(t => pendientes.push(`Tarea: ${esc(t.titulo)} <span class="hint">· ${esc(t.responsable || "")}${t.fecha ? " · " + fdate(t.fecha) : ""}${t.prioridad === "Alta" ? " · <b style='color:var(--bad)'>alta</b>" : ""}</span>`));
-  if (!agReciente) pendientes.push(`El agente Analíticas Meta Ads aún no ha dejado sus recomendaciones (sale lunes, miércoles y viernes a las 9:38)`);
+  if (!EQ) proximosGastos(30).filter(x => x.d <= n(x.g.avisoDias ?? 4)).forEach(x => pendientes.push(`💸 <b>${esc(x.g.concepto)}</b> · ${eur(n(x.g.importe))} se cobra ${x.d < 0 ? `<b style="color:var(--bad)">(vencido hace ${-x.d} d, márcalo como pagado)</b>` : x.d === 0 ? "<b>hoy</b>" : x.d === 1 ? "<b>mañana</b>" : `en ${x.d} días (${fdate(x.f)})`} → <a href="#gastos">Gastos</a>`));
+  if (!agReciente) pendientes.push(`El agente Analíticas Meta Ads aún no ha dejado sus recomendaciones (sale lunes, miércoles y viernes a las 8:03)`);
   const col = (titulo, cls, items, vacio, nota) => `<div class="card" style="margin:0;border-top:4px solid var(--${cls})"><h3 style="margin:0">${titulo} <span class="hint">${(items || []).length}</span></h3>${nota ? `<div class="hint" style="margin:2px 0 4px">${nota}</div>` : ""}${listaAccion(items, vacio)}</div>`;
   return `<h1>Hoy · ${esc(dia)}</h1><div class="sub">Qué hacer hoy, lo pendiente y cómo va la tienda.</div>
   <div class="card"><h3 style="margin:0 0 10px">🏪 Resumen de la tienda</h3><div class="grid">
@@ -392,6 +393,99 @@ function panelKpis() {
     { k: "fecha", label: "Fecha", h: r => fdate(r.fecha) }, { k: "pedido", label: "Pedido" }, { k: "cliente", label: "Cliente" },
     { k: "tipo", label: "Tipo" }, { k: "estado", label: "Estado" }, { k: "responsable", label: "Responsable" }], incAb.slice(0, 8), "Sin incidencias abiertas 🎉")}`;
 }
+
+/* ----- Gastos y cashflow (solo Cristian) ----- */
+const CAT_GASTO = ["Proveedor / stock", "Publicidad", "Software / suscripción", "Logística / almacén", "Colaboradores / nóminas", "Impuestos / gestoría", "Banco / comisiones", "Otros"];
+const FREC = ["Único", "Semanal", "Mensual", "Trimestral", "Anual"];
+const isoMadrid = (d = new Date()) => d.toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
+const diasHasta = f => Math.round((new Date(f + "T00:00:00") - new Date(isoMadrid() + "T00:00:00")) / 864e5);
+function sumarPeriodo(f, frec, diaBase) {
+  const d = new Date(f + "T00:00:00");
+  if (frec === "Semanal") { d.setDate(d.getDate() + 7); return d.toLocaleDateString("sv-SE"); }
+  const meses = { Mensual: 1, Trimestral: 3, Anual: 12 }[frec]; if (!meses) return null;
+  const y = d.getFullYear(), m = d.getMonth() + meses, dia = diaBase || d.getDate();
+  const ult = new Date(y, m + 1, 0).getDate();
+  return new Date(y, m, Math.min(dia, ult)).toLocaleDateString("sv-SE");
+}
+function cobros(g, hasta) {   // fechas de cobro de un gasto entre su próxima fecha y «hasta»
+  if (g.activo === "No" || !g.fecha || (g.frecuencia === "Único" && g.pagado)) return [];
+  const out = []; let f = g.fecha, i = 0;
+  while (f && f <= hasta && i++ < 60) { out.push(f); if (g.frecuencia === "Único") break; f = sumarPeriodo(f, g.frecuencia, g.diaBase); }
+  return out;
+}
+const mensualEq = g => g.activo === "No" ? 0 : n(g.importe) * ({ Semanal: 52 / 12, Mensual: 1, Trimestral: 1 / 3, Anual: 1 / 12 }[g.frecuencia] || 0);
+const proximosGastos = dias => { const hasta = new Date(Date.now() + dias * 864e5).toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
+  return db.gastos.flatMap(g => cobros(g, hasta).map(f => ({ g, f, d: diasHasta(f) }))).sort((a, b) => a.f.localeCompare(b.f)); };
+const F_GASTO = [
+  { k: "concepto", label: "Concepto", full: 1, ph: "Shopify, proveedor GLP, gestoría…" },
+  { k: "importe", label: "Importe (€)", type: "number" },
+  { k: "categoria", label: "Categoría", type: "select", opts: CAT_GASTO },
+  { k: "frecuencia", label: "Frecuencia", type: "select", opts: FREC, def: "Mensual" },
+  { k: "fecha", label: "Próximo cobro", type: "date", def: today(), hint: "En los recurrentes, la fecha del siguiente cargo" },
+  { k: "metodo", label: "Cómo se paga", type: "select", opts: ["Tarjeta", "Domiciliación", "Transferencia", "PayPal", "Efectivo", "Otro"] },
+  { k: "avisoDias", label: "Avisarme con (días)", type: "number", def: 4 },
+  { k: "activo", label: "Activo", type: "select", opts: ["Sí", "No"] },
+  { k: "notas", label: "Notas", type: "textarea", full: 1 }];
+function editGasto(rec) {
+  openForm(rec ? "Editar gasto" : "Nuevo gasto", F_GASTO, rec, r => {
+    if (!r.diaBase || (rec && rec.fecha !== r.fecha)) r.diaBase = r.fecha ? Number(r.fecha.slice(8, 10)) : null;
+    if (r.avisoDias === "") r.avisoDias = 4;
+    return save("gastos", r);
+  });
+}
+async function pagarGasto(id, f) {
+  const g = db.gastos.find(x => x.id === id); if (!g) return;
+  g.pagos = [...(g.pagos || []), { fecha: f, importe: n(g.importe), marcado: new Date().toISOString() }].slice(-36);
+  if (g.frecuencia === "Único") g.pagado = true; else g.fecha = sumarPeriodo(g.fecha, g.frecuencia, g.diaBase);
+  await save("gastos", g); toast(`✔ ${g.concepto} marcado como pagado`); render();
+}
+views.gastos = () => {
+  const p7 = proximosGastos(7), p30 = proximosGastos(30), p60 = proximosGastos(60);
+  const tot = l => l.reduce((a, x) => a + n(x.g.importe), 0);
+  const fijo = db.gastos.reduce((a, g) => a + mensualEq(g), 0);
+  const avisos = p30.filter(x => x.d <= n(x.g.avisoDias ?? 4));
+  const vencidos = p30.filter(x => x.d < 0);
+  const cuando = d => d < 0 ? `<b style="color:var(--bad)">vencido hace ${-d} d</b>` : d === 0 ? `<b style="color:var(--bad)">hoy</b>` : d === 1 ? `<b style="color:var(--warn)">mañana</b>` : `en ${d} días`;
+  const fila = x => `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)">
+      <div style="width:64px;text-align:center"><div style="font-weight:700;color:var(--strong)">${fdate(x.f)}</div><div class="hint">${new Date(x.f + "T00:00:00").toLocaleDateString("es-ES", { weekday: "short" })}</div></div>
+      <div style="flex:1"><b style="color:var(--strong)">${esc(x.g.concepto)}</b> <span class="hint">· ${esc(x.g.categoria || "")} · ${esc(x.g.frecuencia || "")}${x.g.metodo ? " · " + esc(x.g.metodo) : ""}</span><div class="hint">${cuando(x.d)}</div></div>
+      <div style="font-weight:700;color:var(--strong);min-width:90px;text-align:right">${eur(n(x.g.importe))}</div>
+      ${x.f === x.g.fecha && x.d <= 7 ? `<button class="btn sm sec" data-gpay="${x.g.id}" data-gf="${x.f}">✔ Pagado</button>` : `<span style="width:86px"></span>`}</div>`;
+  const semanas = [0, 1, 2, 3].map(k => { const ini = k * 7, fin = ini + 6; const l = p30.filter(x => x.d >= ini && x.d <= fin);
+    return [k === 0 ? "Esta semana" : `Semana ${k + 1}`, tot(l), l.length]; });
+  const maxS = Math.max(1, ...semanas.map(s => s[1]));
+  const lista = [...db.gastos].sort((a, b) => (a.activo === "No") - (b.activo === "No") || (a.fecha || "9").localeCompare(b.fecha || "9"));
+  return `<h1>💸 Gastos y cashflow</h1><div class="sub">Todo lo que paga la tienda y cuándo se cobra. Te aviso ${4} días antes de cada cargo (aquí, en Panel → Hoy y con una notificación a las 8:00). Solo lo ves tú.</div>
+  ${avisos.length ? `<div class="card" style="border-left:4px solid var(--warn);background:var(--warn-soft)"><b>⏰ ${vencidos.length ? `${vencidos.length} vencido${vencidos.length > 1 ? "s" : ""} sin marcar y ` : ""}${avisos.length - vencidos.length} cargo${avisos.length - vencidos.length === 1 ? "" : "s"} en los próximos días: ${eur(tot(avisos))}</b><div class="hint">${avisos.map(x => `${esc(x.g.concepto)} ${eur(n(x.g.importe))} (${x.d < 0 ? "vencido" : x.d === 0 ? "hoy" : x.d === 1 ? "mañana" : "en " + x.d + " días"})`).join(" · ")}</div></div>` : ""}
+  <div class="grid">
+    ${kpi("Próximos 7 días", eur(tot(p7)), `${p7.length} cargo${p7.length === 1 ? "" : "s"}`)}
+    ${kpi("Próximos 30 días", eur(tot(p30)), `${p30.length} cargos`)}
+    ${kpi("Próximos 60 días", eur(tot(p60)), `${p60.length} cargos`)}
+    ${kpi("Gasto fijo al mes", eur(fijo), `${db.gastos.filter(g => g.activo !== "No" && g.frecuencia !== "Único").length} gastos recurrentes`)}
+  </div>
+  <div class="card"><h3 style="margin:0 0 10px">Salidas de dinero por semana (30 días)</h3>
+    ${semanas.map(([l, v, c]) => `<div style="display:flex;align-items:center;gap:10px;margin:6px 0"><span style="width:96px" class="hint">${l}</span><div style="flex:1;background:var(--brand-soft);border-radius:6px;height:18px"><div style="width:${(v / maxS * 100).toFixed(1)}%;background:var(--brand);height:100%;border-radius:6px"></div></div><b style="width:96px;text-align:right;color:var(--strong)">${eur(v)}</b><span class="hint" style="width:60px">${c} cargo${c === 1 ? "" : "s"}</span></div>`).join("")}</div>
+  <div class="toolbar"><h2 style="margin:0">⏰ Próximos cobros · 30 días</h2><span class="grow"></span><button class="btn" id="new-gasto">+ Gasto</button></div>
+  <div class="card">${p30.length ? p30.map(fila).join("") : `<div class="empty">Sin cobros en los próximos 30 días. Añade tus gastos con «+ Gasto».</div>`}</div>
+  <h2>📒 Todos los gastos</h2>${table("gastos", [
+    { k: "concepto", label: "Concepto", h: g => `<span class="name">${esc(g.concepto)}</span>${g.notas ? `<div class="hint">${esc(g.notas)}</div>` : ""}` },
+    { k: "categoria", label: "Categoría" },
+    { k: "importe", label: "Importe", num: 1, v: g => n(g.importe), h: g => eur(n(g.importe)) },
+    { k: "frecuencia", label: "Frecuencia" },
+    { k: "mes", label: "Equivale al mes", num: 1, v: g => mensualEq(g), h: g => g.frecuencia === "Único" ? "—" : eur(mensualEq(g)) },
+    { k: "fecha", label: "Próximo cobro", h: g => g.frecuencia === "Único" && g.pagado ? `<span class="pill ok">Pagado</span>` : g.fecha ? `${fdate(g.fecha)} <span class="hint">· ${diasHasta(g.fecha) < 0 ? "vencido" : diasHasta(g.fecha) + " d"}</span>` : "—" },
+    { k: "metodo", label: "Pago" },
+    { k: "activo", label: "Activo", h: g => g.activo === "No" ? `<span class="hint">No</span>` : "Sí" },
+    { k: "acc", label: "", h: g => `<button class="btn sm sec" data-gedit="${g.id}">Editar</button> <button class="btn sm danger" data-gdel="${g.id}">Borrar</button>` }], lista, "Todavía no hay gastos apuntados")}
+  ${db.gastos.some(g => (g.pagos || []).length) ? `<h2>🧾 Últimos pagos marcados</h2><div class="card">${db.gastos.flatMap(g => (g.pagos || []).map(p => ({ g, p }))).sort((a, b) => b.p.fecha.localeCompare(a.p.fecha)).slice(0, 15).map(x => `<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${fdate(x.p.fecha)} · ${esc(x.g.concepto)}</span><b>${eur(x.p.importe)}</b></div>`).join("")}</div>` : ""}`;
+};
+views.gastos.bind = () => {
+  const b = $("#new-gasto"); if (b) b.onclick = () => editGasto();
+  document.querySelectorAll("[data-gedit]").forEach(x => x.onclick = () => editGasto(db.gastos.find(g => g.id === x.dataset.gedit)));
+  document.querySelectorAll("[data-gdel]").forEach(x => x.onclick = () => armDelete(x, async () => { await remove("gastos", x.dataset.gdel); render(); }));
+  document.querySelectorAll("[data-gpay]").forEach(x => x.onclick = () => pagarGasto(x.dataset.gpay, x.dataset.gf));
+};
+
 views.panel = () => {
   const [tab, tabsHtml] = tabs("panel", [["hoy", "📌 Hoy"], ["kpis", "📊 KPIs"]]);
   return tabsHtml + (tab === "hoy" ? panelHoy() : panelKpis());
@@ -1033,7 +1127,7 @@ function render() {
   views[ui.view].bind && views[ui.view].bind();
 }
 const NAV = EQ ? [["mipanel", "🏠 Mi panel"], ["logistica", "📦 Logística"]]
-  : [["panel", "📊 Panel"], ["meta", "📈 Meta Ads"], ["creativo", "🎬 Director creativo"], ["logistica", "📦 Equipo logístico"], ["competencia", "🔎 Competencia"], ["ajustes", "⚙️ Ajustes"]];
+  : [["panel", "📊 Panel"], ["meta", "📈 Meta Ads"], ["creativo", "🎬 Director creativo"], ["logistica", "📦 Equipo logístico"], ["competencia", "🔎 Competencia"], ["gastos", "💸 Gastos"], ["ajustes", "⚙️ Ajustes"]];
 $("#nav").innerHTML = NAV.map(([k, l]) => `<button data-view="${k}">${l}</button>`).join("")
   + (!EQ ? `<a href="equipo.html" target="_blank" rel="noopener" style="display:block;margin-top:12px;padding:10px 12px;border-radius:8px;color:var(--side-text);text-decoration:none;border:1px dashed #2c4475">👥 Ver panel del equipo ↗</a>
       <button id="lock-crm" title="Olvida el PIN en este navegador" style="margin-top:6px">🔒 Bloquear CRM</button>`
@@ -1042,6 +1136,7 @@ if (EQ) { ui.view = "mipanel"; document.title = "Aurialo · Equipo logístico"; 
 $("#nav").onclick = e => { const b = e.target.closest("button"); if (b && b.id === "lock-crm") { localStorage.removeItem("crm_pin"); location.reload(); return; } if (b) { ui.view = b.dataset.view; location.hash = ui.view; render(); } };
 if (EQ && !localStorage.getItem("crm_yo")) localStorage.setItem("crm_yo", C.equipo.find(p => p !== "Cristian") || C.equipo[0]);
 $("#yo").innerHTML = C.equipo.map(p => `<option ${p === me() ? "selected" : ""}>${p}</option>`).join("");
+window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (views[h] && NAV.some(([k]) => k === h) && h !== ui.view) { ui.view = h; render(); } });
 $("#yo").onchange = e => { localStorage.setItem("crm_yo", e.target.value); render(); };
 
 (async () => {

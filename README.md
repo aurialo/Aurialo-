@@ -78,3 +78,9 @@ Los datos llegan con un **marcador de Chrome** que se ejecuta en `newapp.gobeepi
 ## Alojamiento
 
 Desde el 27/11/2026 la web se publica con **GitHub Pages** (gratis, sin límite de publicaciones): **https://aurialo.github.io/Aurialo-/** (CRM) y **https://aurialo.github.io/Aurialo-/equipo.html** (equipo). Cada cambio subido a `main` se publica solo en 1–2 minutos. La copia antigua en Netlify (aurialo.netlify.app) ya no recibe cambios porque el plan gratuito agotó sus créditos de publicación.
+
+## 💸 Gastos y cashflow (solo Cristian)
+
+Pestaña **Gastos** del CRM (no aparece en el panel del equipo). Cada gasto guarda concepto, importe, categoría, frecuencia (único, semanal, mensual, trimestral, anual), fecha del próximo cobro, forma de pago y con cuántos días avisar (4 por defecto). Muestra lo que sale en 7/30/60 días, el gasto fijo mensual y las salidas por semana. Al pulsar «✔ Pagado» en un recurrente, su fecha pasa al siguiente periodo.
+
+Recordatorios: aparecen en Panel → Hoy y el agente programado «Recordatorio de gastos» ejecuta cada día a las 8:00 `scripts/gastos_aviso.py` y manda una notificación cuando un cargo cae dentro de 4 días, mañana, hoy o está vencido sin marcar.
