@@ -159,7 +159,7 @@ def main():
         per = {}
         for p in EQUIPO:
             h = (hm.get(p) or {}).get("horas", 0.0)
-            per[p] = {"horas": h, "dias": (hm.get(p) or {}).get("dias"), "pagoHoras": round(h * PRECIO_HORA, 2),
+            per[p] = {"horas": h, "dias": (hm.get(p) or {}).get("dias") if (hm.get(p) or {}).get("dias") is not None else ((prev.get("meses", {}).get(mes, {}).get("personas", {}).get(p) or {}).get("dias")), "pagoHoras": round(h * PRECIO_HORA, 2),
                       "carritos": round(n_carr * PRECIO_CARRITO / len(EQUIPO), 2), "bonus": round(bote / len(EQUIPO), 2)}
             per[p]["total"] = round(per[p]["pagoHoras"] + per[p]["carritos"] + per[p]["bonus"], 2)
         meses[mes] = {"personas": per, "carritosEntregados": n_carr,
