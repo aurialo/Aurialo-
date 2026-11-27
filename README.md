@@ -87,7 +87,7 @@ Recordatorios: aparecen en Panel → Hoy y el agente programado «Recordatorio d
 
 ## 💶 Nómina del equipo logístico (solo Cristian)
 
-Pestaña **Equipo logístico → Nómina** (oculta en el panel del equipo). El agente «Nómina equipo» lee cada mañana el Sheet de horas (`1jC86QtM-XqSCOdTnjBw8tUqJ-xOjCXld56dKVrZjKw4`) y la pestaña Carritos recuperados de PEDIDOS E INCIDENCIAS, y ejecuta `scripts/nomina_sync.py horas.txt pedidos.txt`:
+Pestaña **Equipo logístico → Nómina** (oculta en el panel del equipo). El agente «Nómina equipo» lee cada mañana el Sheet de horas y la pestaña Carritos recuperados de PEDIDOS E INCIDENCIAS, y ejecuta `scripts/nomina_sync.py horas.txt pedidos.txt`:
 - 3 €/hora → pago el día 12 del mes siguiente.
 - 0,50 € por carrito recuperado que pasa a ENTREGADO (cuenta en el mes en que se ve entregado), a partes iguales.
 - Bonus sobre el neto mensual de Beeping: confirmación ≥ 80 % → 5 %, ≥ 88 % → 10 %; entrega ≥ 80 % → 5 %, ≥ 85 % → 10 %; a partes iguales. Bonus y carritos → pago el día 25 del mes siguiente.
@@ -97,3 +97,7 @@ Crea o actualiza en Gastos un pago de horas por persona (`nomina_horas_<mes>_<no
 
 Pestaña **Stock** (solo Cristian). `scripts/beeping_stock.js` se ejecuta dentro de newapp.gobeeping.com con la sesión iniciada: lee el stock de cada producto (`/products`) y las unidades de los pedidos procesados de los últimos 14 días (`/orders`, últimas páginas), calcula uds/día (el mayor entre la media de 7 y 14 días), días de stock y fecha estimada de rotura, y guarda `crm:sistema:stock` con un historial diario de 90 días. No guarda el token ni datos de clientes. Avisa para pedir con ≤ 20 días de stock; «rotura» si ya no llegaría a tiempo (plazo 14 días laborables: 10–12 del proveedor + 2 de Beeping). Calcula «pedir antes del» y una cantidad sugerida (plazo + 30 días). Se configura en config.js → stock y al principio del script. La tarjeta «📦 Stock y pedidos» aparece en Panel → Hoy.
 Lo lanza cada mañana el agente «Stock Beeping» con el navegador integrado del ordenador de Cristian (necesita el ordenador encendido con la app de Claude abierta). A mano: marcador «📦 Stock → CRM» de la pestaña Stock.
+
+## Resultados de Beeping al día (Registro-Base)
+
+El agente «Sheet contable → CRM» ejecuta `scripts/beeping_sheet_sync.py <ID>` cada 30 minutos (el ID del Sheet va en la tarea programada, no en el repositorio, que es público): descarga solo la pestaña Registro-Base y la guarda en `crm:sistema:beeping`. Las cifras coinciden con el Informe Contable (mismas fórmulas: % confirmación = confirmados / generados, % entrega = entregados / confirmados, beneficio = importe entregado − total costes − publicidad).

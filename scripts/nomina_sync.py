@@ -4,7 +4,7 @@
 Uso:
     python3 scripts/nomina_sync.py horas.txt pedidos.txt [--dry-run]
 
-horas.txt   = contenido del Sheet "Registro horas equipo logístico Aurialo" (1jC86QtM-XqSCOdTnjBw8tUqJ-xOjCXld56dKVrZjKw4) tal cual lo
+horas.txt   = contenido del Sheet "Registro horas equipo logístico Aurialo" tal cual lo
               devuelve el conector de Google Drive (también vale la exportación a texto).
 pedidos.txt = contenido del Sheet "PEDIDOS E INCIDENCIAS" (pestaña Carritos recuperados).
 
