@@ -144,3 +144,17 @@ details.psec:not([open])>summary::after{transform:rotate(-90deg)}
 .fchip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);background:#fff;border:1px solid var(--line);border-radius:20px;padding:3px 9px;white-space:nowrap}
 .fchip i{width:7px;height:7px;border-radius:50%;display:inline-block}
 @media(max-width:760px){.refresh-bar .btn{width:100%}.fuentes{gap:4px}.fchip{font-size:11px;padding:2px 7px}}
+/* Hoy: cajas por prioridad */
+.hgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px}
+.hbox{border-radius:12px;padding:14px 18px;border:1px solid transparent}
+.hbox-t{font-size:12.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--strong);margin-bottom:8px;display:flex;justify-content:space-between}
+.hbox-t span{color:var(--muted);font-weight:600}
+.hbox ul{margin:0;padding-left:16px}
+.hbox li{margin:7px 0;line-height:1.4;color:var(--strong)}
+.hbox li::marker{color:var(--muted)}
+.hbox li a:hover{text-decoration:underline}
+.hbox.bad{background:var(--bad-soft);border-color:#f6c9ce}
+.hbox.warn{background:var(--warn-soft);border-color:#f3dfb4}
+.hbox.info{background:var(--info-soft);border-color:#c9dcf3}
+.hbox.ok{background:var(--ok-soft);border-color:#bfe6cf}
+@media(max-width:760px){.hgrid{grid-template-columns:1fr;gap:10px}.hbox{padding:12px 14px}}

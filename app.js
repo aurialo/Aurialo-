@@ -388,9 +388,16 @@ function panelHoy() {
   otros.slice(0, 6).forEach(t => urg.push(["ok", `📌 ${esc(t.titulo)}${t.fecha ? ` · ${fdate(t.fecha)}` : ""}`, "#logistica"]));
   const ord = { bad: 0, warn: 1, info: 2, ok: 3 };
   const vistos = new Set(), lista = urg.filter(u => !vistos.has(u[1]) && vistos.add(u[1])).sort((x, y) => ord[x[0]] - ord[y[0]]);
-  const color = { bad: "bad", warn: "warn", info: "brand", ok: "ok" };
-  return `<h1>Hoy · ${esc(dia)}</h1><div class="sub">Lo que hay para hoy, de más a menos importante: 🔴 actuar ya · 🟠 atención · 🟢 cuando puedas.</div>
-  <div class="card" style="padding:6px 16px">${lista.length ? lista.map(([c, t, h]) => `<a href="${h}" ${h.startsWith("#panel-") ? `data-scroll="${h.slice(7)}"` : ""} style="display:flex;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);color:inherit;text-decoration:none"><span style="width:11px;height:11px;border-radius:50%;background:var(--${color[c]});flex:0 0 auto"></span><span style="flex:1;line-height:1.35">${t}</span><span class="hint">›</span></a>`).join("") : `<div class="hint" style="padding:12px 0">Nada para hoy 🎉</div>`}</div>
+  const item = ([c, t, h]) => `<li><a href="${h}" ${h.startsWith("#panel-") ? `data-scroll="${h.slice(7)}"` : ""} style="color:inherit;text-decoration:none">${t}</a></li>`;
+  const caja = (cls, titulo, items, vacio) => `<div class="hbox ${cls}"><div class="hbox-t">${titulo}<span>${items.length || ""}</span></div>${items.length ? `<ul>${items.map(item).join("")}</ul>` : `<div class="hint">${vacio}</div>`}</div>`;
+  const G = k => lista.filter(x => x[0] === k);
+  return `<h1>Hoy · ${esc(dia)}</h1><div class="sub">Resumen de lo que hay para hoy, de más a menos importante. Pulsa cualquier línea para ir a su página.</div>
+  <div class="hgrid">
+    ${caja("bad", "🔴 Actuar ya", G("bad"), "Nada urgente 🎉")}
+    ${caja("warn", "🟠 Atención", G("warn"), "Nada que vigilar")}
+    ${caja("info", "🔵 Avisos y equipo", G("info"), "Sin avisos nuevos")}
+    ${caja("ok", "🟢 Cuando puedas", G("ok"), "Nada pendiente")}
+  </div>
   ${fb.length ? `<details id="panel-feedback" class="card psec"><summary><h3 style="display:inline;margin:0">💬 Notas del equipo sin recoger · ${fb.length}</h3></summary><div style="margin-top:10px">${fb.slice(0, 10).map(notaCard).join("")}</div></details>` : ""}`;
 }
 
