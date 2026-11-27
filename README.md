@@ -101,3 +101,7 @@ Lo lanza cada mañana el agente «Stock Beeping» con el navegador integrado del
 ## Resultados de Beeping al día (Registro-Base)
 
 El agente «Sheet contable → CRM» ejecuta `scripts/beeping_sheet_sync.py <ID>` cada 30 minutos (el ID del Sheet va en la tarea programada, no en el repositorio, que es público): descarga solo la pestaña Registro-Base y la guarda en `crm:sistema:beeping`. Las cifras coinciden con el Informe Contable (mismas fórmulas: % confirmación = confirmados / generados, % entrega = entregados / confirmados, beneficio = importe entregado − total costes − publicidad).
+
+## 🧠 Cerebro Meta (propuestas para aprobar)
+
+Agente «Cerebro Meta» (lunes, miércoles y viernes 8:52, después de los informes): `scripts/cerebro_contexto.py` junta por producto nuestros creativos y su rendimiento por ángulo y formato, las recomendaciones de Analíticas, lo que hace la competencia, lo que ya está en producción, las propuestas previas (aprobadas y descartadas, con motivo) y el stock. El agente propone acciones concretas (iterar, nuevo ángulo, nuevo formato, escalar, pausar, oferta, landing) con hooks, guion y KPI, y `scripts/propuestas_sync.py` las guarda en `crm:propuestas:*`. En la pestaña **🧠 Cerebro Meta** Cristian aprueba (creativos → Director creativo en «Idea»; resto → Tareas privadas) o descarta con motivo, del que el cerebro aprende. No toca nada en Meta.

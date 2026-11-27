@@ -4,7 +4,7 @@
 (() => {
 const C = window.AURIALO_CONFIG;
 const EQ = window.CRM_MODO === "equipo";
-const COLS = ["creativos", "produccion", "confirmaciones", "incidencias", "tareas", "competidores", "anuncios", "sistema", "notas"].concat(EQ ? [] : ["gastos"]);
+const COLS = ["creativos", "produccion", "confirmaciones", "incidencias", "tareas", "competidores", "anuncios", "sistema", "notas"].concat(EQ ? [] : ["gastos", "propuestas"]);
 const OBJ = Object.assign({ conf: 0.78, confTop: 0.80, confAviso: 0.70, entrega: 0.85, devol: 0.15, sinMotivo: 0.3 }, C.objetivos || {});
 const objConf = () => `${Math.round(OBJ.conf * 100)}–${Math.round(OBJ.confTop * 100)} %`;   // panel del equipo logístico: solo logística y sin datos de dinero
 const db = Object.fromEntries(COLS.map(c => [c, []]));
@@ -50,7 +50,7 @@ async function load() {
       const [, col] = row.clave.slice(C.prefijo.length).match(/^([^:]+):/) || [];
       if (!db[col]) return;
       let v = row.valor; if (typeof v === "string") { try { v = JSON.parse(v); } catch { return; } }
-      if (v && v.id) db[col].push(v);
+      if (v && v.id && !(EQ && v.privada)) db[col].push(v);
     });
     online = true;
     localStorage.setItem("crm_cache", JSON.stringify(db));
@@ -312,6 +312,8 @@ function panelHoy() {
     <div style="margin-top:10px">${fb.slice(0, 8).map(notaCard).join("")}${fb.length > 8 ? `<div class="hint">…y ${fb.length - 8} más en Notas del equipo</div>` : ""}</div></div>` : "";
   return `<h1>Hoy · ${esc(dia)}</h1><div class="sub">Qué hacer hoy, lo pendiente y cómo va la tienda.</div>
   ${fbCard}
+  ${!EQ && propPend().length ? `<div class="card" style="border-left:4px solid var(--brand)"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center"><h3 style="margin:0">🧠 El cerebro propone ${propPend().length} cosa${propPend().length > 1 ? "s" : ""}</h3><a class="btn sm" href="#cerebro">Revisar y aprobar</a></div>
+    <ul class="rules" style="margin:8px 0 0;padding-left:18px">${propPend().sort((a, b) => ({ Alta: 0, Media: 1, Baja: 2 }[a.prioridad] - { Alta: 0, Media: 1, Baja: 2 }[b.prioridad])).slice(0, 5).map(p => `<li>${TIPO_PROP[p.tipo] || ""} <b>${esc(prodName(p.producto))}</b>: ${esc(p.titulo)}${p.prioridad === "Alta" ? ` <span class="pill bad" style="padding:1px 7px">alta</span>` : ""}</li>`).join("")}</ul></div>` : ""}
   ${!EQ ? stockPanel() : ""}
   <div class="card"><h3 style="margin:0 0 10px">🏪 Resumen de la tienda</h3><div class="grid">
     ${kpi(`Pedidos hoy · Shopify`, sHoy ? `${sHoy.pedidos} pedidos` : "—", sHoy ? `${eur(sHoy.ventas)} · ${mix(sHoy)}${sh.ultimoPedido ? ` · último ${esc(sh.ultimoPedido.name)} a las ${new Date(sh.ultimoPedido.createdAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" })}` : ""}` : "Sin datos de hoy todavía")}
@@ -555,6 +557,63 @@ views.stock.bind = async () => {
     bm.href = "javascript:" + encodeURIComponent(code.replace(/\/\*[\s\S]*?\*\//, "").replace(/^\(async/m, "void (async").replace(/\)\(\)\s*$/, ")().then(r=>alert('Stock enviado al CRM ✔\\n'+r.productos.map(p=>p.nombre+': '+p.disponible+' uds'+(p.diasCobertura!=null?' · '+p.diasCobertura+' días':'')).join('\\n'))).catch(e=>alert('Error: '+e.message))"));
     bm.onclick = e => { if (!/gobeeping/.test(location.host)) { e.preventDefault(); toast("Arrástralo a la barra de marcadores y úsalo dentro de Beeping"); } };
   } catch (e) {}
+};
+
+
+/* ----- Cerebro Meta: propuestas para aprobar (solo Cristian) ----- */
+const TIPO_PROP = { "Iterar": "🔁", "Nuevo ángulo": "💡", "Nuevo formato": "🎬", "Escalar": "🚀", "Pausar": "⛔", "Oferta": "🏷️", "Landing": "🛒" };
+const CREATIVAS = ["Iterar", "Nuevo ángulo", "Nuevo formato"];
+const propPend = () => EQ ? [] : db.propuestas.filter(p => p.estado === "Pendiente");
+function propCard(p) {
+  const pr = { Alta: "bad", Media: "warn", Baja: "info" }[p.prioridad] || "";
+  return `<div class="card" style="margin-bottom:10px;border-left:4px solid var(--${pr || "line"})">
+    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div>${prodPill(p.producto)} <span class="pill">${TIPO_PROP[p.tipo] || ""} ${esc(p.tipo)}</span> <span class="pill ${pr}">${esc(p.prioridad)}</span>${p.origen ? ` <span class="hint">· ${esc(p.origen)}</span>` : ""}</div>
+    <span class="hint">${new Date(p.fecha).toLocaleDateString("es-ES", { weekday: "short", day: "2-digit", month: "short" })}</span></div>
+    <h3 style="margin:8px 0 4px">${esc(p.titulo)}</h3>
+    ${p.que ? `<div style="white-space:pre-wrap"><b>Qué hacer:</b> ${esc(p.que)}</div>` : ""}
+    ${p.porque ? `<div class="hint" style="margin-top:4px;white-space:pre-wrap"><b>Por qué:</b> ${esc(p.porque)}</div>` : ""}
+    ${(p.hooks || []).length ? `<div style="margin-top:6px"><b>Hooks:</b><ul class="rules" style="margin:2px 0;padding-left:18px">${p.hooks.map(h => `<li>«${esc(h)}»</li>`).join("")}</ul></div>` : ""}
+    ${p.angulo || p.formato ? `<div class="hint">Creativo: <code>${esc(nombreCreativo({ angulo: p.angulo, ident: p.ident, producto: p.producto }))}</code>${p.formato ? ` · ${esc(p.formato)}` : ""}</div>` : ""}
+    ${p.guion ? `<details style="margin-top:4px"><summary class="hint">Guion</summary><div style="white-space:pre-wrap;font-size:13px">${esc(p.guion)}</div></details>` : ""}
+    ${p.kpi ? `<div class="hint" style="margin-top:4px">🎯 ${esc(p.kpi)}</div>` : ""}
+    ${p.estado === "Pendiente" ? `<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn" data-papr="${p.id}">✔ Aprobar</button><button class="btn sec" data-pedit="${p.id}">✏️ Ajustar</button><button class="btn danger" data-pdesc="${p.id}">✖ Descartar</button></div>`
+      : `<div class="hint" style="margin-top:8px">${p.estado === "Aprobada" ? `✔ Aprobada ${p.aprobadaEn ? fdate(p.aprobadaEn.slice(0, 10)) : ""} → ${p.destino || ""}` : `✖ Descartada${p.motivoDescarte ? `: ${esc(p.motivoDescarte)}` : ""}`}</div>`}</div>`;
+}
+async function aprobarProp(p) {
+  const finde = [5, 6, 0].includes(new Date().getDay());
+  const lunes = () => { const d = new Date(); do d.setDate(d.getDate() + 1); while (d.getDay() !== 1); return d.toISOString().slice(0, 10); };
+  const notas = [p.que && "Qué hacer: " + p.que, p.porque && "Por qué: " + p.porque, p.kpi && "Objetivo: " + p.kpi].filter(Boolean).join("\n\n");
+  if (CREATIVAS.includes(p.tipo)) {
+    const r = await save("produccion", { producto: p.producto, angulo: p.angulo || p.titulo, ident: p.ident || "Var1", formato: p.formato || "", estado: "Idea", fechaPrev: nextLaunch(),
+      responsable: "Cristian", hook: (p.hooks || []).join("\n"), guion: p.guion || "", notas, propuestaId: p.id });
+    p.destino = "Director creativo (Idea)"; p.prodId = r.id;
+  } else {
+    const r = await save("tareas", { titulo: `${TIPO_PROP[p.tipo] || ""} ${p.titulo}`.trim(), responsable: "Cristian", prioridad: p.prioridad || "Media", estado: "Pendiente",
+      fecha: ["Escalar", "Pausar"].includes(p.tipo) && finde ? lunes() : today(), notas, privada: true, propuestaId: p.id });
+    p.destino = "Tareas"; p.tareaId = r.id;
+  }
+  p.estado = "Aprobada"; p.aprobadaEn = new Date().toISOString();
+  await save("propuestas", p); toast(`✔ Aprobada → ${p.destino}`); render();
+}
+views.cerebro = () => {
+  const B = db.sistema.find(x => x.id === "cerebro");
+  const [tab, tabsHtml] = tabs("cerebro", [["pend", `Por aprobar (${propPend().length})`], ["apr", "Aprobadas"], ["desc", "Descartadas"]]);
+  const f = ui.filters.cerebro || (ui.filters.cerebro = { prod: "" });
+  const est = { pend: "Pendiente", apr: "Aprobada", desc: "Descartada" }[tab];
+  const L = db.propuestas.filter(p => p.estado === est && (!f.prod || p.producto === f.prod))
+    .sort((a, b) => est === "Pendiente" ? ({ Alta: 0, Media: 1, Baja: 2 }[a.prioridad] - { Alta: 0, Media: 1, Baja: 2 }[b.prioridad]) || b.fecha.localeCompare(a.fecha) : b.fecha.localeCompare(a.fecha));
+  const prods = [...new Set(db.propuestas.map(p => p.producto))];
+  return `<h1>🧠 Cerebro Meta</h1><div class="sub">Cruza lo que funciona en nuestros anuncios con lo que hace la competencia y te propone qué probar, iterar, escalar o pausar en cada producto. Tú solo apruebas: los creativos van al Director creativo (fase Idea, con hooks y guion) y el resto a Tareas.</div>
+  ${B ? `<div class="card" style="border-left:4px solid var(--brand)"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><h3 style="margin:0">Lectura del momento</h3><span class="hint">${new Date(B.fecha).toLocaleString("es-ES", { weekday: "long", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span></div>
+    ${B.resumen ? `<p style="margin:8px 0">${esc(B.resumen)}</p>` : ""}
+    ${Object.keys(B.estrategia || {}).length ? `<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">${Object.entries(B.estrategia).map(([k, v]) => `<div style="border:1px solid var(--line);border-radius:10px;padding:10px">${prodPill(k)}<div style="margin-top:6px;font-size:13px">${esc(v)}</div></div>`).join("")}</div>` : ""}</div>`
+    : `<div class="card empty">El cerebro aún no ha hecho su primera lectura. Sale lunes, miércoles y viernes a las 8:52, después de los informes de Meta y de competencia.</div>`}
+  ${tabsHtml}
+  <div class="toolbar"><select id="cer-prod"><option value="">Todos los productos</option>${prods.map(c => `<option value="${c}" ${c === f.prod ? "selected" : ""}>${esc(prodName(c))}</option>`).join("")}</select><span class="grow"></span></div>
+  ${L.length ? L.map(propCard).join("") : `<div class="card empty">${est === "Pendiente" ? "Nada pendiente de aprobar 🎉" : "Todavía no hay propuestas aquí"}</div>`}`;
+};
+views.cerebro.bind = () => {
+  const s = $("#cer-prod"); if (s) s.onchange = e => { ui.filters.cerebro = { prod: e.target.value }; render(); };
 };
 
 views.panel = () => {
@@ -1121,6 +1180,13 @@ document.addEventListener("click", async e => {
   if (d.nedit) editNota(db.notas.find(x => x.id === d.nedit));
   if (d.nresp) responderNota(db.notas.find(x => x.id === d.nresp));
   if (d.ndel) armDelete(t, async () => { await remove("notas", d.ndel); render(); });
+  if (d.papr) { const p = db.propuestas.find(x => x.id === d.papr); if (p) await aprobarProp(p); }
+  if (d.pdesc) { const p = db.propuestas.find(x => x.id === d.pdesc); if (p) openForm("Descartar propuesta", [{ k: "motivoDescarte", label: "¿Por qué? (opcional, el cerebro aprende de esto)", type: "textarea", full: 1 }], p,
+    r => save("propuestas", { ...r, estado: "Descartada", descartadaEn: new Date().toISOString() })); }
+  if (d.pedit) { const p = db.propuestas.find(x => x.id === d.pedit); if (p) openForm("Ajustar propuesta", [{ k: "titulo", label: "Título", full: 1 }, { k: "que", label: "Qué hacer", type: "textarea", full: 1 },
+    { k: "angulo", label: "Ángulo" }, { k: "ident", label: "Identificación / variante" }, { k: "formato", label: "Formato", type: "select", opts: ["", ...C.formatos] }, { k: "prioridad", label: "Prioridad", type: "select", opts: ["Alta", "Media", "Baja"] },
+    { k: "hooksTxt", label: "Hooks (uno por línea)", type: "textarea", full: 1 }, { k: "guion", label: "Guion", type: "textarea", full: 1 }], { ...p, hooksTxt: (p.hooks || []).join("\n") },
+    r => { r.hooks = String(r.hooksTxt || "").split("\n").map(x => x.trim()).filter(Boolean); delete r.hooksTxt; return save("propuestas", r); }); }
   if (d.nrev) { const x = db.notas.find(y => y.id === d.nrev); x.revisada = true; x.revisadaEn = new Date().toISOString(); await save("notas", x); toast("✔ Feedback recogido"); render(); }
   if (d.nfix) { const x = db.notas.find(y => y.id === d.nfix); x.fijada = !x.fijada; await save("notas", x); render(); }
 });
@@ -1276,7 +1342,7 @@ function render() {
   views[ui.view].bind && views[ui.view].bind();
 }
 const NAV = EQ ? [["mipanel", "🏠 Mi panel"], ["logistica", "📦 Logística"]]
-  : [["panel", "📊 Panel"], ["meta", "📈 Meta Ads"], ["creativo", "🎬 Director creativo"], ["logistica", "📦 Equipo logístico"], ["competencia", "🔎 Competencia"], ["stock", "📦 Stock"], ["gastos", "💸 Gastos"], ["ajustes", "⚙️ Ajustes"]];
+  : [["panel", "📊 Panel"], ["meta", "📈 Meta Ads"], ["cerebro", "🧠 Cerebro Meta"], ["creativo", "🎬 Director creativo"], ["logistica", "📦 Equipo logístico"], ["competencia", "🔎 Competencia"], ["stock", "📦 Stock"], ["gastos", "💸 Gastos"], ["ajustes", "⚙️ Ajustes"]];
 $("#nav").innerHTML = NAV.map(([k, l]) => `<button data-view="${k}">${l}</button>`).join("")
   + (!EQ ? `<a href="equipo.html" target="_blank" rel="noopener" style="display:block;margin-top:12px;padding:10px 12px;border-radius:8px;color:var(--side-text);text-decoration:none;border:1px dashed #2c4475">👥 Ver panel del equipo ↗</a>
       <button id="lock-crm" title="Olvida el PIN en este navegador" style="margin-top:6px">🔒 Bloquear App</button>`
