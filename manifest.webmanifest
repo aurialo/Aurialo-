@@ -1,6 +1,6 @@
 {
-  "name": "Aurialo CRM",
-  "short_name": "Aurialo CRM",
+  "name": "Aurialo App",
+  "short_name": "Aurialo App",
   "id": "./index.html",
   "start_url": "./index.html#panel",
   "scope": "./",
