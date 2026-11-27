@@ -92,3 +92,8 @@ Pestaña **Equipo logístico → Nómina** (oculta en el panel del equipo). El a
 - 0,50 € por carrito recuperado que pasa a ENTREGADO (cuenta en el mes en que se ve entregado), a partes iguales.
 - Bonus sobre el neto mensual de Beeping: confirmación ≥ 80 % → 5 %, ≥ 88 % → 10 %; entrega ≥ 80 % → 5 %, ≥ 85 % → 10 %; a partes iguales. Bonus y carritos → pago el día 25 del mes siguiente.
 Crea o actualiza en Gastos un pago de horas por persona (`nomina_horas_<mes>_<nombre>`) y el de bonus y carritos (`nomina_bonus_<mes>`) (no toca los ya marcados como pagados). Las reglas están al principio del script.
+
+## 📦 Stock (Beeping)
+
+Pestaña **Stock** (solo Cristian). `scripts/beeping_stock.js` se ejecuta dentro de newapp.gobeeping.com con la sesión iniciada: lee el stock de cada producto (`/products`) y las unidades de los pedidos procesados de los últimos 14 días (`/orders`, últimas páginas), calcula uds/día (el mayor entre la media de 7 y 14 días), días de stock y fecha estimada de rotura, y guarda `crm:sistema:stock` con un historial diario de 90 días. No guarda el token ni datos de clientes. Aviso con ≤ 14 días, «reponer ya» con ≤ 7 (constantes al principio del script).
+Lo lanza cada mañana el agente «Stock Beeping» con el navegador integrado del ordenador de Cristian (necesita el ordenador encendido con la app de Claude abierta). A mano: marcador «📦 Stock → CRM» de la pestaña Stock.

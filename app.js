@@ -300,6 +300,7 @@ function panelHoy() {
   if (listos.length) pendientes.push(`${listos.length} creativos listos para lanzar (${listos.slice(0, 3).map(p => esc(nombreCreativo(p))).join(", ")}${listos.length > 3 ? "…" : ""})`);
   if ([2, 4].includes(w) && !listos.length) pendientes.push("Hoy es día de lanzamiento y no hay creativos en «Listo»");
   tar.slice(0, 6).forEach(t => pendientes.push(`Tarea: ${esc(t.titulo)} <span class="hint">· ${esc(t.responsable || "")}${t.fecha ? " · " + fdate(t.fecha) : ""}${t.prioridad === "Alta" ? " · <b style='color:var(--bad)'>alta</b>" : ""}</span>`));
+  if (!EQ) stockAlertas().forEach(p => pendientes.push(`📦 <b>${esc(p.nombre)}</b>: ${p.disponible} uds · ${p.diasCobertura != null ? `quedan ~${String(p.diasCobertura).replace(".", ",")} días (se acaba ~${fdate(p.agotaEl)})` : "<b style='color:var(--bad)'>agotado</b>"} → <a href="#stock">Stock</a>`));
   if (!EQ) proximosGastos(30).filter(x => x.d <= n(x.g.avisoDias ?? 4)).forEach(x => pendientes.push(`💸 <b>${esc(x.g.concepto)}</b> · ${eur(n(x.g.importe))} se cobra ${x.d < 0 ? `<b style="color:var(--bad)">(vencido hace ${-x.d} d, márcalo como pagado)</b>` : x.d === 0 ? "<b>hoy</b>" : x.d === 1 ? "<b>mañana</b>" : `en ${x.d} días (${fdate(x.f)})`} → <a href="#gastos">Gastos</a>`));
   if (!agReciente) pendientes.push(`El agente Analíticas Meta Ads aún no ha dejado sus recomendaciones (sale lunes, miércoles y viernes a las 8:03)`);
   const col = (titulo, cls, items, vacio, nota) => `<div class="card" style="margin:0;border-top:4px solid var(--${cls})"><h3 style="margin:0">${titulo} <span class="hint">${(items || []).length}</span></h3>${nota ? `<div class="hint" style="margin:2px 0 4px">${nota}</div>` : ""}${listaAccion(items, vacio)}</div>`;
@@ -486,6 +487,48 @@ views.gastos.bind = () => {
   document.querySelectorAll("[data-gedit]").forEach(x => x.onclick = () => editGasto(db.gastos.find(g => g.id === x.dataset.gedit)));
   document.querySelectorAll("[data-gdel]").forEach(x => x.onclick = () => armDelete(x, async () => { await remove("gastos", x.dataset.gdel); render(); }));
   document.querySelectorAll("[data-gpay]").forEach(x => x.onclick = () => pagarGasto(x.dataset.gpay, x.dataset.gf));
+};
+
+
+/* ----- Stock (Beeping) ----- */
+const ESTADO_STOCK = { "agotado": ["bad", "⛔ Agotado"], "reponer ya": ["bad", "🔴 Reponer ya"], "aviso": ["warn", "🟠 Pedir pronto"], "ok": ["ok", "🟢 Bien"], "sin ventas": ["info", "Sin ventas"], "sin stock": ["", "Sin stock"] };
+const stockAlertas = () => { const S = db.sistema.find(x => x.id === "stock"); return S ? (S.productos || []).filter(p => ["agotado", "reponer ya", "aviso"].includes(p.estado)) : []; };
+views.stock = () => {
+  const S = db.sistema.find(x => x.id === "stock");
+  const marcador = `<a class="btn sec" id="stock-bm" href="#" title="Arrástralo a la barra de marcadores y púlsalo con Beeping abierto">📦 Stock → CRM</a>`;
+  if (!S) return `<h1>📦 Stock</h1><div class="card empty">Aún no hay datos de stock. El agente «Stock Beeping» los lee cada mañana; también puedes usar el marcador ${marcador} con Beeping abierto.</div>`;
+  const hace = Math.round((Date.now() - new Date(S.fecha).getTime()) / 36e5);
+  const L = [...(S.productos || [])].sort((a, b) => (a.diasCobertura ?? 1e9) - (b.diasCobertura ?? 1e9));
+  const act = L.filter(p => p.enviadas14 >= 3 || p.disponible > 0);
+  const al = stockAlertas();
+  const fechas = Object.keys(S.historial || {}).sort().slice(-14);
+  const spark = id => { const v = fechas.map(f => (S.historial[f] || {})[id]).filter(x => x != null); if (v.length < 2) return ""; const mx = Math.max(...v, 1), w = 90, h = 24;
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline fill="none" stroke="var(--brand)" stroke-width="2" points="${v.map((x, i) => `${(i / (v.length - 1) * (w - 4) + 2).toFixed(1)},${(h - 2 - x / mx * (h - 4)).toFixed(1)}`).join(" ")}"/></svg>`; };
+  return `<h1>📦 Stock</h1><div class="sub">Stock del almacén de Beeping y cuántos días te quedan al ritmo de envíos actual (el mayor entre la media de 7 y la de 14 días). Aviso con ${S.aviso} días o menos, «reponer ya» con ${S.critico}.</div>
+  <div class="toolbar"><span class="hint">Actualizado ${hace < 1 ? "hace menos de 1 h" : `hace ${hace} h`} · ${new Date(S.fecha).toLocaleString("es-ES", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span><span class="grow"></span>${marcador}</div>
+  ${al.length ? `<div class="card" style="border-left:4px solid var(--bad);background:var(--bad-soft)"><b>⚠️ ${al.length} producto${al.length > 1 ? "s" : ""} con poco stock:</b> ${al.map(p => `${esc(p.nombre)} (${p.disponible} uds · ${p.diasCobertura != null ? `${String(p.diasCobertura).replace(".", ",")} días, se acaba ~${fdate(p.agotaEl)}` : "agotado"})`).join(" · ")}</div>` : `<div class="card" style="border-left:4px solid var(--ok)">✅ Todo el stock cubre más de ${S.aviso} días.</div>`}
+  <div class="grid">${act.map(p => { const [c, t] = ESTADO_STOCK[p.estado] || ["", p.estado];
+    return `<div class="kpi" style="border-top:4px solid var(--${c || "line"})"><div class="l">${esc(p.nombre)} <span class="hint">${esc(p.code || "")}</span></div>
+      <div class="v">${p.disponible} <span style="font-size:13px;font-weight:500" class="hint">uds</span></div>
+      <div class="s"><span class="pill ${c}" style="padding:2px 8px">${t}</span> ${p.diasCobertura != null ? `<b>${String(p.diasCobertura).replace(".", ",")} días</b> · hasta ~${fdate(p.agotaEl)}` : ""}</div>
+      <div class="s">${String(p.porDia).replace(".", ",")} uds/día · ${p.enviadas7} enviadas en 7 d · ${p.enviadas14} en 14 d${p.porConfirmar ? ` · ${p.porConfirmar} por confirmar` : ""}${p.entrante ? ` · ${p.entrante} entrantes` : ""}</div>
+      <div style="margin-top:4px">${spark(p.id)}</div></div>`; }).join("")}</div>
+  <h2>Detalle</h2>${table("stock", [
+    { k: "nombre", label: "Producto", h: p => `<span class="name">${esc(p.nombre)}</span> <span class="hint">${esc(p.code || "")}</span>${(p.tiendas || []).length ? `<div class="hint">${esc(p.tiendas.join(" · "))}</div>` : ""}` },
+    { k: "disponible", label: "Disponible", num: 1 }, { k: "entrante", label: "Entrante", num: 1 }, { k: "reservado", label: "Reservado", num: 1 },
+    { k: "porConfirmar", label: "Por confirmar", num: 1 }, { k: "enviadas7", label: "Enviadas 7 d", num: 1 }, { k: "enviadas14", label: "Enviadas 14 d", num: 1 },
+    { k: "porDia", label: "Uds/día", num: 1, h: p => String(p.porDia).replace(".", ",") },
+    { k: "diasCobertura", label: "Días de stock", num: 1, v: p => p.diasCobertura ?? 1e9, h: p => p.diasCobertura != null ? String(p.diasCobertura).replace(".", ",") : "—" },
+    { k: "agotaEl", label: "Se acaba", h: p => p.agotaEl ? fdate(p.agotaEl) : "—" },
+    { k: "estado", label: "Estado", h: p => { const [c, t] = ESTADO_STOCK[p.estado] || ["", p.estado]; return `<span class="pill ${c}">${t}</span>`; } }], L)}
+  <div class="hint" style="margin-top:8px">Unidades enviadas = pedidos procesados por Beeping (no cuenta cancelados). «Por confirmar» son unidades de pedidos que aún pueden salir. Para actualizar a mano: arrastra el botón «📦 Stock → CRM» a la barra de marcadores y púlsalo con newapp.gobeeping.com abierto.</div>`;
+};
+views.stock.bind = async () => {
+  const bm = $("#stock-bm"); if (!bm) return;
+  try { const code = await (await fetch("scripts/beeping_stock.js?v=" + Date.now())).text();
+    bm.href = "javascript:" + encodeURIComponent(code.replace(/\/\*[\s\S]*?\*\//, "").replace(/^\(async/m, "void (async").replace(/\)\(\)\s*$/, ")().then(r=>alert('Stock enviado al CRM ✔\\n'+r.productos.map(p=>p.nombre+': '+p.disponible+' uds'+(p.diasCobertura!=null?' · '+p.diasCobertura+' días':'')).join('\\n'))).catch(e=>alert('Error: '+e.message))"));
+    bm.onclick = e => { if (!/gobeeping/.test(location.host)) { e.preventDefault(); toast("Arrástralo a la barra de marcadores y úsalo dentro de Beeping"); } };
+  } catch (e) {}
 };
 
 views.panel = () => {
@@ -1201,7 +1244,7 @@ function render() {
   views[ui.view].bind && views[ui.view].bind();
 }
 const NAV = EQ ? [["mipanel", "🏠 Mi panel"], ["logistica", "📦 Logística"]]
-  : [["panel", "📊 Panel"], ["meta", "📈 Meta Ads"], ["creativo", "🎬 Director creativo"], ["logistica", "📦 Equipo logístico"], ["competencia", "🔎 Competencia"], ["gastos", "💸 Gastos"], ["ajustes", "⚙️ Ajustes"]];
+  : [["panel", "📊 Panel"], ["meta", "📈 Meta Ads"], ["creativo", "🎬 Director creativo"], ["logistica", "📦 Equipo logístico"], ["competencia", "🔎 Competencia"], ["stock", "📦 Stock"], ["gastos", "💸 Gastos"], ["ajustes", "⚙️ Ajustes"]];
 $("#nav").innerHTML = NAV.map(([k, l]) => `<button data-view="${k}">${l}</button>`).join("")
   + (!EQ ? `<a href="equipo.html" target="_blank" rel="noopener" style="display:block;margin-top:12px;padding:10px 12px;border-radius:8px;color:var(--side-text);text-decoration:none;border:1px dashed #2c4475">👥 Ver panel del equipo ↗</a>
       <button id="lock-crm" title="Olvida el PIN en este navegador" style="margin-top:6px">🔒 Bloquear CRM</button>`
