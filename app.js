@@ -674,7 +674,7 @@ function fuentesDatos() {
   const S = id => db.sistema.find(x => x.id === id);
   const h = f => f ? (Date.now() - new Date(f).getTime()) / 36e5 : null;
   const L = [
-    ["Shopify", S("shopify") && S("shopify").fecha, 2.5, "cada hora (8–23 h)"],
+    ["Shopify", S("shopify") && S("shopify").fecha, 2.5, "cada 2 h (8–22 h)"],
     ["Beeping (Sheet)", beeping.fecha, 1.5, beeping.fuente && /directo/.test(beeping.fuente) ? "en directo" : "cada hora"],
     ["Meta Ads", S("metasync") && S("metasync").fecha, 84, "lun, mié y vie 8:03"],
     ["Stock", S("stock") && S("stock").fecha, 26, "cada día 8:13"],
