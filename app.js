@@ -268,7 +268,7 @@ function panelHoy() {
   const ag = db.sistema.find(x => x.id === "acciones");
   const agReciente = ag && Date.now() - new Date(ag.fecha).getTime() < 3.5 * 864e5;
   const A = agReciente ? { escalar: ag.escalar || [], apagar: ag.apagar || [], sano: ag.sano || [], vigilar: [...(ag.esperar || []), ...(ag.vigilar || [])], iterar: ag.iterar || [] } : { ...accionesCalculadas(), iterar: [] };
-  const fuente = agReciente ? `Según el agente <b>Analíticas Meta Ads</b> · ${new Date(ag.fecha).toLocaleString("es-ES", { weekday: "long", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}${ag.titular ? " · " + esc(ag.titular) : ""}` : "Calculado con los anuncios activos en Meta y el CPA máximo de cada producto (datos acumulados de cada anuncio)";
+  const fuente = agReciente ? `Según el agente <b>Analíticas Meta Ads</b> · ${new Date(ag.fecha).toLocaleString("es-ES", { weekday: "long", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}${ag.titular ? " · " + esc(ag.titular) : ""}${ag.totales ? " · " + esc(ag.totales) : ""}` : "Calculado con los anuncios activos en Meta y el CPA máximo de cada producto (datos acumulados de cada anuncio)";
   const dIso = k => new Date(Date.now() - k * 864e5).toISOString().slice(0, 10);
   const b7 = aggBeeping(beeping.rows.filter(r => r.fecha >= dIso(6)));
   const bc = aggBeeping(beeping.rows.filter(r => r.fecha >= dIso(13) && r.fecha <= dIso(7)));
