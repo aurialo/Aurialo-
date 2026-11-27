@@ -4,7 +4,7 @@
 Uso:
     python3 scripts/nomina_sync.py horas.txt pedidos.txt [--dry-run]
 
-horas.txt   = contenido del Sheet "Registro_horas_equipo_logístico_Aurialo" tal cual lo
+horas.txt   = contenido del Sheet "Registro horas equipo logístico Aurialo" (1jC86QtM-XqSCOdTnjBw8tUqJ-xOjCXld56dKVrZjKw4) tal cual lo
               devuelve el conector de Google Drive (también vale la exportación a texto).
 pedidos.txt = contenido del Sheet "PEDIDOS E INCIDENCIAS" (pestaña Carritos recuperados).
 
@@ -63,6 +63,16 @@ def put(clave, valor, dry):
     urllib.request.urlopen(req, timeout=30).read()
 
 
+def horas_total(b):
+    """Total horas del mes en cualquiera de los formatos: duración de Drive, 30:38 o 8,00."""
+    m = re.search(r"Total horas del mes[^\n]*?hours=\"(\d+)\"\s+minutes=\"(\d+)\"(?:\s+seconds=\"(\d+)\")?", b)
+    if m: return round(int(m.group(1)) + int(m.group(2)) / 60 + int(m.group(3) or 0) / 3600, 4)
+    m = re.search(r"Total horas del mes\W+(\d+):(\d{2})", b)
+    if m: return round(int(m.group(1)) + int(m.group(2)) / 60, 4)
+    m = re.search(r"Total horas del mes\W+([\d.,]+)", b)
+    return num(m.group(1)) if m else 0.0
+
+
 def parse_horas(txt):
     """{'2026-11': {'Florencia': {'horas': 8.0, 'dias': 3}, ...}}"""
     out = {}
@@ -72,10 +82,9 @@ def parse_horas(txt):
         if not m: continue
         persona, mes, anio = m.group(1), MESES.get(norm(m.group(2))), int(m.group(3))
         if not mes: continue
-        h = re.search(r"Total horas del mes\W+([\d.,]+)", b)
         d = re.search(r"D.as trabajados\W+(\d+)", b)
         k = f"{anio}-{mes:02d}"
-        out.setdefault(k, {})[persona] = {"horas": num(h.group(1)) if h else 0.0, "dias": int(d.group(1)) if d else 0}
+        out.setdefault(k, {})[persona] = {"horas": horas_total(b), "dias": int(d.group(1)) if d else None}
     return out
 
 
@@ -150,7 +159,7 @@ def main():
         per = {}
         for p in EQUIPO:
             h = (hm.get(p) or {}).get("horas", 0.0)
-            per[p] = {"horas": h, "dias": (hm.get(p) or {}).get("dias", 0), "pagoHoras": round(h * PRECIO_HORA, 2),
+            per[p] = {"horas": h, "dias": (hm.get(p) or {}).get("dias"), "pagoHoras": round(h * PRECIO_HORA, 2),
                       "carritos": round(n_carr * PRECIO_CARRITO / len(EQUIPO), 2), "bonus": round(bote / len(EQUIPO), 2)}
             per[p]["total"] = round(per[p]["pagoHoras"] + per[p]["carritos"] + per[p]["bonus"], 2)
         meses[mes] = {"personas": per, "carritosEntregados": n_carr,
@@ -166,7 +175,7 @@ def main():
         tot_b = round(sum(x["carritos"] + x["bonus"] for x in per.values()), 2)
         for gid, concepto, fecha, importe, nota in [
             (f"nomina_horas_{mes}", f"Equipo logístico · horas {etiqueta}", meses[mes]["pagoHorasFecha"], tot_h,
-             " · ".join(f"{p} {per[p]['horas']:.2f} h = {per[p]['pagoHoras']:.2f} €" for p in EQUIPO)),
+             " · ".join(f"{p} {int(per[p]['horas'])}:{round(per[p]['horas'] % 1 * 60):02d} h = {per[p]['pagoHoras']:.2f} €" for p in EQUIPO)),
             (f"nomina_bonus_{mes}", f"Equipo logístico · bonus y carritos {etiqueta}", meses[mes]["pagoBonusFecha"], tot_b,
              f"{n_carr} carritos entregados · bonus {int((pc + pe) * 100)} % del neto ({b['beneficio']:.2f} €) · confirmación "
              f"{(b['pConf'] or 0) * 100:.1f} % · entrega {(b['pEnt'] or 0) * 100:.1f} % · {'PROVISIONAL' if meses[mes]['provisional'] else 'definitivo'}"),

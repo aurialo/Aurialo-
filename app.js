@@ -753,11 +753,12 @@ function nominaView() {
   const tr = (t) => (t || []).map(([l, p]) => `≥ ${Math.round(l * 100)} % → ${Math.round(p * 100)} %`).join(" · ");
   const falta = (v, t) => { const s = [...(t || [])].sort((a, b) => a[0] - b[0]); const sig = s.find(([l]) => v == null || v < l); return sig ? `faltan ${((sig[0] - (v || 0)) * 100).toFixed(1).replace(".", ",")} puntos para el ${Math.round(sig[1] * 100)} %` : "tramo máximo"; };
   const pers = Object.entries(M.personas || {});
+  const hm = h => `${Math.floor(n(h))}:${String(Math.round((n(h) % 1) * 60)).padStart(2, "0")} h`;
   const tot = k => pers.reduce((a, [, p]) => a + n(p[k]), 0);
   return `<div class="toolbar"><select id="nom-mes">${meses.map(k => `<option value="${k}" ${k === mes ? "selected" : ""}>${nomMes(k)}</option>`).join("")}</select>
     <span class="hint">${M.enCurso ? "Mes en curso: las cifras van cambiando." : M.provisional ? "Bonus provisional hasta que se cierren las entregas." : "Mes cerrado."} Horas del Sheet de registro · confirmación, entrega y neto de Beeping${N.beepingHasta ? ` (datos hasta ${fdate(N.beepingHasta)})` : ""}.</span></div>
   <div class="grid">
-    ${pers.map(([nom, p]) => kpi(nom, eur(p.total), `${String(p.horas.toFixed(2)).replace(".", ",")} h en ${p.dias} días = ${eur(p.pagoHoras)} · carritos ${eur(p.carritos)} · bonus ${eur(p.bonus)}`)).join("")}
+    ${pers.map(([nom, p]) => kpi(nom, eur(p.total), `${hm(p.horas)}${p.dias != null ? ` en ${p.dias} días` : ""} = ${eur(p.pagoHoras)} · carritos ${eur(p.carritos)} · bonus ${eur(p.bonus)}`)).join("")}
     ${kpi("Total equipo", eur(tot("total")), `Horas ${eur(tot("pagoHoras"))} el ${fdate(M.pagoHorasFecha)} · bonus y carritos ${eur(tot("bonus") + tot("carritos"))} el ${fdate(M.pagoBonusFecha)}`)}
   </div>
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
@@ -772,7 +773,7 @@ function nominaView() {
   </div>
   <h2>Por mes</h2>${table("nom-hist", [
     { k: "mes", label: "Mes", h: r => nomMes(r.mes) + (r.m.enCurso ? ` <span class="pill info">en curso</span>` : r.m.provisional ? ` <span class="pill warn">provisional</span>` : "") },
-    ...Object.keys(N.meses[meses[0]].personas).map(p => ({ k: p, label: p, num: 1, v: r => n(r.m.personas[p] && r.m.personas[p].total), h: r => r.m.personas[p] ? `${eur(r.m.personas[p].total)} <span class="hint">· ${r.m.personas[p].horas} h</span>` : "—" })),
+    ...Object.keys(N.meses[meses[0]].personas).map(p => ({ k: p, label: p, num: 1, v: r => n(r.m.personas[p] && r.m.personas[p].total), h: r => r.m.personas[p] ? `${eur(r.m.personas[p].total)} <span class="hint">· ${hm(r.m.personas[p].horas)}</span>` : "—" })),
     { k: "conf", label: "% Conf.", h: r => pct(r.m.beeping.pConf) }, { k: "ent", label: "% Entrega", h: r => pct(r.m.beeping.pEnt) },
     { k: "neto", label: "Neto", h: r => eur(n(r.m.beeping.beneficio)) }, { k: "bote", label: "Bonus", h: r => `${Math.round((r.m.pctConf + r.m.pctEnt) * 100)} % · ${eur(r.m.bote)}` },
     { k: "car", label: "Carritos", num: 1, v: r => r.m.carritosEntregados }], meses.map(k => ({ mes: k, m: N.meses[k] })))}
