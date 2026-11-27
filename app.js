@@ -468,7 +468,7 @@ views.gastos = () => {
   <div class="toolbar"><h2 style="margin:0">⏰ Próximos cobros · 30 días</h2><span class="grow"></span><button class="btn" id="new-gasto">+ Gasto</button></div>
   <div class="card">${p30.length ? p30.map(fila).join("") : `<div class="empty">Sin cobros en los próximos 30 días. Añade tus gastos con «+ Gasto».</div>`}</div>
   <h2>📒 Todos los gastos</h2>${table("gastos", [
-    { k: "concepto", label: "Concepto", h: g => `<span class="name">${esc(g.concepto)}</span>${g.notas ? `<div class="hint">${esc(g.notas)}</div>` : ""}` },
+    { k: "concepto", label: "Concepto", h: g => `<span class="name">${esc(g.concepto)}</span>${g.auto ? ` <span class="pill info" title="Lo calcula la pestaña Nómina">auto</span>` : ""}${g.notas ? `<div class="hint">${esc(g.notas)}</div>` : ""}` },
     { k: "categoria", label: "Categoría" },
     { k: "importe", label: "Importe", num: 1, v: g => n(g.importe), h: g => eur(n(g.importe)) },
     { k: "frecuencia", label: "Frecuencia" },
@@ -738,11 +738,50 @@ const F_TAR = [
   { k: "prioridad", label: "Prioridad", type: "select", opts: ["Alta", "Media", "Baja"], def: "Media" },
   { k: "estado", label: "Estado", type: "select", opts: ["Pendiente", "En curso", "Hecha"] }, { k: "fecha", label: "Fecha límite", type: "date" },
   { k: "notas", label: "Notas", type: "textarea", full: 1 }];
+
+/* ----- Nómina del equipo logístico (solo Cristian) ----- */
+function nominaView() {
+  const N = db.sistema.find(x => x.id === "nomina");
+  if (!N) return `<div class="card empty">Aún no hay datos de nómina. El agente «Nómina equipo» los calcula cada día con el Sheet de horas y los carritos recuperados.</div>`;
+  const R = N.reglas || {}, meses = Object.keys(N.meses || {}).sort().reverse();
+  const f = ui.filters.nom || (ui.filters.nom = { mes: meses[0] });
+  const mes = meses.includes(f.mes) ? f.mes : meses[0];
+  const M = N.meses[mes], B = M.beeping || {};
+  const nomMes = k => new Date(k + "-01T00:00:00").toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+  const tr = (t) => (t || []).map(([l, p]) => `≥ ${Math.round(l * 100)} % → ${Math.round(p * 100)} %`).join(" · ");
+  const falta = (v, t) => { const s = [...(t || [])].sort((a, b) => a[0] - b[0]); const sig = s.find(([l]) => v == null || v < l); return sig ? `faltan ${((sig[0] - (v || 0)) * 100).toFixed(1).replace(".", ",")} puntos para el ${Math.round(sig[1] * 100)} %` : "tramo máximo"; };
+  const pers = Object.entries(M.personas || {});
+  const tot = k => pers.reduce((a, [, p]) => a + n(p[k]), 0);
+  return `<div class="toolbar"><select id="nom-mes">${meses.map(k => `<option value="${k}" ${k === mes ? "selected" : ""}>${nomMes(k)}</option>`).join("")}</select>
+    <span class="hint">${M.enCurso ? "Mes en curso: las cifras van cambiando." : M.provisional ? "Bonus provisional hasta que se cierren las entregas." : "Mes cerrado."} Horas del Sheet de registro · confirmación, entrega y neto de Beeping${N.beepingHasta ? ` (datos hasta ${fdate(N.beepingHasta)})` : ""}.</span></div>
+  <div class="grid">
+    ${pers.map(([nom, p]) => kpi(nom, eur(p.total), `${String(p.horas.toFixed(2)).replace(".", ",")} h en ${p.dias} días = ${eur(p.pagoHoras)} · carritos ${eur(p.carritos)} · bonus ${eur(p.bonus)}`)).join("")}
+    ${kpi("Total equipo", eur(tot("total")), `Horas ${eur(tot("pagoHoras"))} el ${fdate(M.pagoHorasFecha)} · bonus y carritos ${eur(tot("bonus") + tot("carritos"))} el ${fdate(M.pagoBonusFecha)}`)}
+  </div>
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+    <div class="card" style="margin:0"><h3 style="margin:0 0 6px">✅ Confirmación</h3><div style="font-size:24px;font-weight:700"><span class="pill ${M.pctConf >= .1 ? "ok" : M.pctConf ? "info" : "warn"}" style="font-size:20px">${pct(B.pConf)}</span></div>
+      <div class="hint">${n(B.confirmados)} de ${n(B.generados)} pedidos · bonus ${Math.round(M.pctConf * 100)} % del neto · ${falta(B.pConf, R.tramosConf)}</div><div class="hint">Tramos: ${tr(R.tramosConf)}</div></div>
+    <div class="card" style="margin:0"><h3 style="margin:0 0 6px">📦 Entrega</h3><div style="font-size:24px;font-weight:700"><span class="pill ${M.pctEnt >= .1 ? "ok" : M.pctEnt ? "info" : "warn"}" style="font-size:20px">${pct(B.pEnt)}</span></div>
+      <div class="hint">${n(B.entregados)} de ${n(B.confirmados)} confirmados · bonus ${Math.round(M.pctEnt * 100)} % del neto · ${falta(B.pEnt, R.tramosEnt)}</div><div class="hint">Tramos: ${tr(R.tramosEnt)}</div></div>
+    <div class="card" style="margin:0"><h3 style="margin:0 0 6px">💰 Neto de la tienda</h3><div style="font-size:24px;font-weight:700;color:var(--${n(B.beneficio) >= 0 ? "ok" : "bad"})">${eur(n(B.beneficio))}</div>
+      <div class="hint">Bote de bonus: ${Math.round((M.pctConf + M.pctEnt) * 100)} % = ${eur(M.bote)}, a partes iguales${n(B.beneficio) < 0 ? " (con neto negativo no hay bonus)" : ""}</div></div>
+    <div class="card" style="margin:0"><h3 style="margin:0 0 6px">🛒 Carritos recuperados</h3><div style="font-size:24px;font-weight:700">${M.carritosEntregados}</div>
+      <div class="hint">Entregados este mes × ${eur(R.precioCarrito)} = ${eur(M.carritosEntregados * n(R.precioCarrito))}, a partes iguales</div></div>
+  </div>
+  <h2>Por mes</h2>${table("nom-hist", [
+    { k: "mes", label: "Mes", h: r => nomMes(r.mes) + (r.m.enCurso ? ` <span class="pill info">en curso</span>` : r.m.provisional ? ` <span class="pill warn">provisional</span>` : "") },
+    ...Object.keys(N.meses[meses[0]].personas).map(p => ({ k: p, label: p, num: 1, v: r => n(r.m.personas[p] && r.m.personas[p].total), h: r => r.m.personas[p] ? `${eur(r.m.personas[p].total)} <span class="hint">· ${r.m.personas[p].horas} h</span>` : "—" })),
+    { k: "conf", label: "% Conf.", h: r => pct(r.m.beeping.pConf) }, { k: "ent", label: "% Entrega", h: r => pct(r.m.beeping.pEnt) },
+    { k: "neto", label: "Neto", h: r => eur(n(r.m.beeping.beneficio)) }, { k: "bote", label: "Bonus", h: r => `${Math.round((r.m.pctConf + r.m.pctEnt) * 100)} % · ${eur(r.m.bote)}` },
+    { k: "car", label: "Carritos", num: 1, v: r => r.m.carritosEntregados }], meses.map(k => ({ mes: k, m: N.meses[k] })))}
+  <div class="hint" style="margin-top:8px">Reglas: ${eur(R.precioHora)}/hora (se paga el día ${R.diaPagoHoras}) · ${eur(R.precioCarrito)} por carrito recuperado y entregado · bonus sobre el neto mensual de Beeping por confirmación (${tr(R.tramosConf)}) y por entrega (${tr(R.tramosEnt)}), a partes iguales; bonus y carritos se pagan el día ${R.diaPagoBonus}. Los dos pagos aparecen en 💸 Gastos con su aviso 4 días antes. Actualizado ${new Date(N.fecha).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}.</div>`;
+}
 views.logistica = () => {
   const nPend = db.notas.filter(x => x.tipo === "Duda para Cristian" && !x.respuesta).length;
-  const [tab, tabsHtml] = tabs("logistica", [["res", "Resultados (Beeping)"], ["mot", "Motivos de rechazo"], ...(EQ ? [] : [["conf", "Confirmaciones WhatsApp"]]), ["inc", "Incidencias"], ["tar", "Tareas"], ["notas", `📝 Notas del equipo${nPend ? ` (${nPend})` : ""}`]].filter(Boolean));
+  const [tab, tabsHtml] = tabs("logistica", [["res", "Resultados (Beeping)"], ["mot", "Motivos de rechazo"], ...(EQ ? [] : [["conf", "Confirmaciones WhatsApp"]]), ["inc", "Incidencias"], ["tar", "Tareas"], ["notas", `📝 Notas del equipo${nPend ? ` (${nPend})` : ""}`], ...(EQ ? [] : [["nom", "💶 Nómina"]])].filter(Boolean));
   let body = "";
-  if (tab === "notas") body = notasView();
+  if (tab === "nom" && !EQ) body = nominaView();
+  else if (tab === "notas") body = notasView();
   else if (tab === "mot") {
     const M = db.sistema.find(x => x.id === "motivos");
     if (!M) body = `<div class="card empty">Aún no hay motivos cargados. El agente «Motivos de rechazo» los saca cada día del Sheet PEDIDOS E INCIDENCIAS.</div>`;
@@ -854,6 +893,7 @@ views.logistica = () => {
   return `<h1>Equipo logístico</h1><div class="sub">Confirmaciones COD por WhatsApp, incidencias de envío y tareas del equipo (${C.equipo.slice(1).join(" y ")}).</div>${tabsHtml}${body}`;
 };
 views.logistica.bind = () => {
+  const nm = $("#nom-mes"); if (nm) nm.onchange = e => { ui.filters.nom = { mes: e.target.value }; render(); };
   const on = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
   on("#new-conf", () => openForm("Registro de confirmaciones", F_CONF, { persona: me() }, r => save("confirmaciones", r)));
   on("#new-inc", () => openForm("Nueva incidencia", F_INC, { responsable: me(), estado: "Abierta" }, r => save("incidencias", r)));

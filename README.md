@@ -84,3 +84,11 @@ Desde el 27/11/2026 la web se publica con **GitHub Pages** (gratis, sin límite 
 Pestaña **Gastos** del CRM (no aparece en el panel del equipo). Cada gasto guarda concepto, importe, categoría, frecuencia (único, semanal, mensual, trimestral, anual), fecha del próximo cobro, forma de pago y con cuántos días avisar (4 por defecto). Muestra lo que sale en 7/30/60 días, el gasto fijo mensual y las salidas por semana. Al pulsar «✔ Pagado» en un recurrente, su fecha pasa al siguiente periodo.
 
 Recordatorios: aparecen en Panel → Hoy y el agente programado «Recordatorio de gastos» ejecuta cada día a las 8:00 `scripts/gastos_aviso.py` y manda una notificación cuando un cargo cae dentro de 4 días, mañana, hoy o está vencido sin marcar.
+
+## 💶 Nómina del equipo logístico (solo Cristian)
+
+Pestaña **Equipo logístico → Nómina** (oculta en el panel del equipo). El agente «Nómina equipo» lee cada mañana el Sheet de horas (`11IApLuadKNigUwTXNyCVXjnxbXm9pMj7xHrPm2X83EA`) y la pestaña Carritos recuperados de PEDIDOS E INCIDENCIAS, y ejecuta `scripts/nomina_sync.py horas.txt pedidos.txt`:
+- 3 €/hora → pago el día 12 del mes siguiente.
+- 0,50 € por carrito recuperado que pasa a ENTREGADO (cuenta en el mes en que se ve entregado), a partes iguales.
+- Bonus sobre el neto mensual de Beeping: confirmación ≥ 80 % → 5 %, ≥ 88 % → 10 %; entrega ≥ 80 % → 5 %, ≥ 85 % → 10 %; a partes iguales. Bonus y carritos → pago el día 25 del mes siguiente.
+Crea o actualiza en Gastos los pagos `nomina_horas_<mes>` y `nomina_bonus_<mes>` (no toca los ya marcados como pagados). Las reglas están al principio del script.
