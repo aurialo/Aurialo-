@@ -1035,10 +1035,11 @@ function render() {
 const NAV = EQ ? [["mipanel", "🏠 Mi panel"], ["logistica", "📦 Logística"]]
   : [["panel", "📊 Panel"], ["meta", "📈 Meta Ads"], ["creativo", "🎬 Director creativo"], ["logistica", "📦 Equipo logístico"], ["competencia", "🔎 Competencia"], ["ajustes", "⚙️ Ajustes"]];
 $("#nav").innerHTML = NAV.map(([k, l]) => `<button data-view="${k}">${l}</button>`).join("")
-  + (!EQ ? `<a href="/equipo" target="_blank" rel="noopener" style="display:block;margin-top:12px;padding:10px 12px;border-radius:8px;color:var(--side-text);text-decoration:none;border:1px dashed #2c4475">👥 Ver panel del equipo ↗</a>`
+  + (!EQ ? `<a href="/equipo" target="_blank" rel="noopener" style="display:block;margin-top:12px;padding:10px 12px;border-radius:8px;color:var(--side-text);text-decoration:none;border:1px dashed #2c4475">👥 Ver panel del equipo ↗</a>
+      <button id="lock-crm" title="Olvida el PIN en este navegador" style="margin-top:6px">🔒 Bloquear CRM</button>`
     : (C.pinHash && localStorage.getItem("crm_pin") === C.pinHash ? `<a href="/" style="display:block;margin-top:12px;padding:10px 12px;border-radius:8px;color:var(--side-text);text-decoration:none;border:1px dashed #2c4475">← Volver a mi CRM</a>` : ""));
 if (EQ) { ui.view = "mipanel"; document.title = "Aurialo · Equipo logístico"; document.querySelector(".brand").innerHTML = '<span class="dot"></span>Aurialo <b>Logística</b>'; }
-$("#nav").onclick = e => { const b = e.target.closest("button"); if (b) { ui.view = b.dataset.view; location.hash = ui.view; render(); } };
+$("#nav").onclick = e => { const b = e.target.closest("button"); if (b && b.id === "lock-crm") { localStorage.removeItem("crm_pin"); location.reload(); return; } if (b) { ui.view = b.dataset.view; location.hash = ui.view; render(); } };
 if (EQ && !localStorage.getItem("crm_yo")) localStorage.setItem("crm_yo", C.equipo.find(p => p !== "Cristian") || C.equipo[0]);
 $("#yo").innerHTML = C.equipo.map(p => `<option ${p === me() ? "selected" : ""}>${p}</option>`).join("");
 $("#yo").onchange = e => { localStorage.setItem("crm_yo", e.target.value); render(); };
