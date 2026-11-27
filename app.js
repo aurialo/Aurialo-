@@ -380,17 +380,18 @@ function panelHoy() {
   const otrosHtml = (otros.length || incMan.length || (inc && inc.zombies) || !agReciente) ? `<ul class="rules" style="margin:0">${otros.slice(0, 8).map(t => `<li>📌 ${esc(t.titulo)} <span class="hint">· ${esc(t.responsable || "")}${t.fecha ? " · " + fdate(t.fecha) : ""}</span></li>`).join("")}
     ${incMan.length ? `<li>${incMan.length} incidencias del registro manual abiertas</li>` : ""}${inc && inc.zombies ? `<li>${inc.zombies} incidencias abiertas en Beeping con el envío ya cerrado: cerrarlas</li>` : ""}
     ${!agReciente ? `<li class="hint">El agente Analíticas Meta Ads aún no ha dejado recomendaciones (lunes, miércoles y viernes 8:03)</li>` : ""}</ul>` : "";
-  return `<h1>Hoy · ${esc(dia)}</h1><div class="sub">Cada recuadro es un área: 🟢 bien · 🟠 atención · 🔴 actuar. Púlsalo para ir al detalle.</div>
-  <div class="tiles">${tiles.join("")}</div>
-  <div class="card" style="border-left:5px solid var(--${urg.some(u => u[0] === "bad") ? "bad" : urg.length ? "warn" : "ok"})"><h3 style="margin:0 0 6px">🔥 Para hoy ${urg.length ? `<span class="hint">${urg.length}</span>` : ""}</h3>
-    ${urg.length ? `<div>${urg.map(([c, t, h]) => `<a href="${h}" ${h.startsWith("#panel-") ? `data-scroll="${h.slice(7)}"` : ""} style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);color:inherit;text-decoration:none"><span style="width:9px;height:9px;border-radius:50%;background:var(--${c});flex:0 0 auto"></span><span style="flex:1">${t}</span><span class="hint">›</span></a>`).join("")}</div>` : `<div class="hint">Nada urgente hoy 🎉</div>`}</div>
-  ${sec("meta", `📈 Meta Ads · ${A.escalar.length} escalar · ${A.apagar.length} parar · ${A.vigilar.length} vigilar`, metaHtml, A.escalar.length + A.apagar.length > 0)}
-  ${!EQ ? sec("cerebro", `🧠 Propuestas del cerebro · ${pp.length}`, cerHtml, ppAlta.length > 0) : ""}
-  ${sec("feedback", `💬 Feedback del equipo · ${fb.length} sin recoger`, fbHtml, fb.length > 0)}
-  ${!EQ ? sec("stock", `🏷️ Stock para pedir · ${stA.length}`, stA.length ? stockPanel() : "", true) : ""}
-  ${sec("tienda", "🏪 Detalle de la tienda", tiendaHtml, false)}
-  ${sec("agentes", `🤖 Lo que dicen los agentes · ${avisos.length}`, agHtml, false)}
-  ${sec("otros", "📋 Otras tareas y pendientes", otrosHtml, false)}`;
+  // avisos de los agentes de hoy, como información
+  avisos.filter(x => new Date(x.fecha).toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" }) === hoyISO && x.titular)
+    .forEach(x => urg.push(["info", `🤖 <b>${esc(x.agente)}:</b> ${esc(x.titular)}`, x.enlace && x.enlace.includes("#") ? "#" + x.enlace.split("#")[1] : "#panel"]));
+  fb.forEach(x => urg.push([x.tipo === "Duda para Cristian" ? "warn" : "info", `💬 <b>${esc(x.autor || "Equipo")}</b> · ${esc(x.tipo || "Nota")}: ${esc((x.respuesta && x.respondidoPor !== "Cristian" ? x.respuesta : x.texto || "").slice(0, 140))}`, "#panel-feedback"]));
+  pp.filter(p => p.prioridad !== "Alta").length && urg.push(["ok", `🧠 ${pp.filter(p => p.prioridad !== "Alta").length} propuestas más del cerebro por revisar`, "#cerebro"]);
+  otros.slice(0, 6).forEach(t => urg.push(["ok", `📌 ${esc(t.titulo)}${t.fecha ? ` · ${fdate(t.fecha)}` : ""}`, "#logistica"]));
+  const ord = { bad: 0, warn: 1, info: 2, ok: 3 };
+  const vistos = new Set(), lista = urg.filter(u => !vistos.has(u[1]) && vistos.add(u[1])).sort((x, y) => ord[x[0]] - ord[y[0]]);
+  const color = { bad: "bad", warn: "warn", info: "brand", ok: "ok" };
+  return `<h1>Hoy · ${esc(dia)}</h1><div class="sub">Lo que hay para hoy, de más a menos importante: 🔴 actuar ya · 🟠 atención · 🟢 cuando puedas.</div>
+  <div class="card" style="padding:6px 16px">${lista.length ? lista.map(([c, t, h]) => `<a href="${h}" ${h.startsWith("#panel-") ? `data-scroll="${h.slice(7)}"` : ""} style="display:flex;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);color:inherit;text-decoration:none"><span style="width:11px;height:11px;border-radius:50%;background:var(--${color[c]});flex:0 0 auto"></span><span style="flex:1;line-height:1.35">${t}</span><span class="hint">›</span></a>`).join("") : `<div class="hint" style="padding:12px 0">Nada para hoy 🎉</div>`}</div>
+  ${fb.length ? `<details id="panel-feedback" class="card psec"><summary><h3 style="display:inline;margin:0">💬 Notas del equipo sin recoger · ${fb.length}</h3></summary><div style="margin-top:10px">${fb.slice(0, 10).map(notaCard).join("")}</div></details>` : ""}`;
 }
 
 function panelKpis() {
@@ -674,7 +675,7 @@ function fuentesDatos() {
   const S = id => db.sistema.find(x => x.id === id);
   const h = f => f ? (Date.now() - new Date(f).getTime()) / 36e5 : null;
   const L = [
-    ["Shopify", S("shopify") && S("shopify").fecha, 2.5, "cada 2 h (8–22 h)"],
+    ["Shopify", S("shopify") && S("shopify").fecha, 1.5, "cada hora (8–23 h)"],
     ["Beeping (Sheet)", beeping.fecha, 1.5, beeping.fuente && /directo/.test(beeping.fuente) ? "en directo" : "cada hora"],
     ["Meta Ads", S("metasync") && S("metasync").fecha, 84, "lun, mié y vie 8:03"],
     ["Stock", S("stock") && S("stock").fecha, 26, "cada día 8:13"],
@@ -698,7 +699,7 @@ async function refrescarTodo(btn) {
 }
 views.panel = () => {
   const [tab, tabsHtml] = tabs("panel", [["hoy", "📌 Hoy"], ["kpis", "📊 KPIs"]]);
-  return `<div class="refresh-bar"><button class="btn sm sec" id="refresh-all">🔄 Actualizar datos</button>${fuentesHtml()}</div>` + tabsHtml + (tab === "hoy" ? panelHoy() : panelKpis());
+  return `<div class="refresh-bar"><button class="btn sm sec" id="refresh-all">🔄 Actualizar datos</button><span class="hint">${(() => { const v = fuentesDatos().filter(([, f, lim]) => !f || (Date.now() - new Date(f).getTime()) / 36e5 > lim).map(x => x[0]); return v.length ? `Con retraso: ${v.join(", ")}` : "Datos al día"; })()}</span></div>` + tabsHtml + (tab === "hoy" ? panelHoy() : panelKpis());
 };
 views.panel.bind = () => {
   document.querySelectorAll("[data-goinc]").forEach(g => g.onclick = e => { e.preventDefault(); ui.view = "logistica"; ui.tabs.logistica = "inc"; location.hash = "logistica"; render(); });
