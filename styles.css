@@ -166,3 +166,5 @@ details.psec:not([open])>summary::after{transform:rotate(-90deg)}
 .tconj td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 .tconj .num{text-align:right;white-space:nowrap}
 @media(max-width:760px){.tienda .tminis{grid-template-columns:repeat(2,minmax(0,1fr))}.tmini .tv{font-size:17px}}
+.sm-only{display:none}
+@media(max-width:760px){.tconj .hm{display:none}.sm-only{display:block}.tconj{font-size:12px}.tconj td,.tconj th{padding:6px 5px}}
