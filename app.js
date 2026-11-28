@@ -391,7 +391,38 @@ function panelHoy() {
   const item = ([c, t, h]) => `<li><a href="${h}" ${h.startsWith("#panel-") ? `data-scroll="${h.slice(7)}"` : ""} style="color:inherit;text-decoration:none">${t}</a></li>`;
   const caja = (cls, titulo, items, vacio) => `<div class="hbox ${cls}"><div class="hbox-t">${titulo}<span>${items.length || ""}</span></div>${items.length ? `<ul>${items.map(item).join("")}</ul>` : `<div class="hint">${vacio}</div>`}</div>`;
   const G = k => lista.filter(x => x[0] === k);
+  // ---- cómo va la tienda: pedidos, facturación y conjuntos activos ----
+  const dSem = (sh && sh.dias || []).filter(d => d.fecha < hoyISO).slice(-7);
+  const fact7 = dSem.reduce((t, d) => t + n(d.ventas), 0), ped7 = dSem.reduce((t, d) => t + n(d.pedidos), 0);
+  const cmp = (v, ref) => v == null || !ref ? "" : `<span style="color:var(--${v >= ref ? "ok" : "bad"});font-weight:600">${v >= ref ? "▲" : "▼"} ${Math.abs(Math.round((v / ref - 1) * 100))} %</span> vs media`;
+  const mini = (l, v, sub) => `<div class="tmini"><div class="hint">${l}</div><div class="tv">${v}</div><div class="hint">${sub || ""}</div></div>`;
+  let conj = [], fuenteConj = "";
+  if (agReciente) {
+    const vist = new Map();
+    ["escalar", "sano", "esperar", "vigilar", "apagar"].forEach(k => (ag[k] || []).forEach(x => { const key = x.conjunto || x.nombre; if (key && !vist.has(key)) vist.set(key, { conjunto: key, producto: x.producto, gasto: n(x.gasto), compras: n(x.compras), roas: x.roas != null ? n(x.roas) : null, cpa: x.cpa != null ? n(x.cpa) : (n(x.compras) ? n(x.gasto) / n(x.compras) : null) }); }));
+    conj = [...vist.values()]; fuenteConj = `Últimos 14 días · agente Analíticas Meta Ads (${new Date(ag.fecha).toLocaleDateString("es-ES", { weekday: "short", day: "2-digit", month: "short" })})`;
+  } else {
+    const g = new Map();
+    db.creativos.filter(r => r.estadoMeta === "ACTIVE" && r.conjunto).forEach(r => { const x = m(r), k = r.conjunto; const o = g.get(k) || { conjunto: k, producto: r.producto, gasto: 0, compras: 0, ing: 0 }; o.gasto += x.gasto; o.compras += x.compras; o.ing += x.ingresos; g.set(k, o); });
+    conj = [...g.values()].map(o => ({ ...o, roas: o.gasto ? o.ing / o.gasto : null, cpa: o.compras ? o.gasto / o.compras : null })); fuenteConj = "Acumulado desde el lanzamiento de cada anuncio activo (Meta)";
+  }
+  const estC = c => { const P = C.productos.find(q => q.code === c.producto) || {}; if (!c.compras) return c.gasto >= 15 ? "bad" : "line"; if (!P.cpaMax) return (c.roas || 0) >= 3 ? "ok" : "warn"; return c.cpa <= P.cpaObj ? "ok" : c.cpa <= P.cpaMax ? "warn" : "bad"; };
+  conj.sort((a, b) => b.gasto - a.gasto);
+  const tienda = !EQ ? `<div class="card tienda"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline"><h3 style="margin:0">🏪 Cómo va la tienda</h3><span class="hint">Shopify ${sh ? new Date(sh.fecha).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : "—"}</span></div>
+    <div class="tminis">
+      ${mini("Pedidos hoy", sHoy ? sHoy.pedidos : "—", sHoy && media ? cmp(sHoy.pedidos, media * Math.min(1, Math.max(.05, horaMad / 24))) + " (a esta hora)" : "")}
+      ${mini("Facturación hoy", sHoy ? eur(sHoy.ventas) : "—", sHoy ? mix(sHoy) : "")}
+      ${mini("Ayer", sAyer ? `${sAyer.pedidos} · ${eur(sAyer.ventas)}` : "—", sAyer && media ? cmp(sAyer.pedidos, media) : "")}
+      ${mini("Últimos 7 días", `${ped7} · ${eur(fact7)}`, `media ${String((ped7 / Math.max(dSem.length, 1)).toFixed(1)).replace(".", ",")} pedidos y ${eur(fact7 / Math.max(dSem.length, 1))} al día`)}
+    </div>
+    <div class="hint" style="margin:12px 0 6px"><b style="color:var(--strong)">Conjuntos activos</b> · ${fuenteConj} · 🟢 CPA dentro del objetivo · 🟠 entre objetivo y máximo · 🔴 por encima del máximo o sin ventas</div>
+    ${conj.length ? `<div class="tbl-wrap"><table class="tconj"><thead><tr><th></th><th>Conjunto</th><th>Producto</th><th class="num">Gasto</th><th class="num">Compras</th><th class="num">CPA</th><th class="num">ROAS</th></tr></thead><tbody>
+      ${conj.slice(0, 12).map(c => { const P = C.productos.find(q => q.code === c.producto) || {}, st = estC(c);
+        return `<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--${st})"></span></td><td>${esc(c.conjunto)}</td><td>${esc(prodName(c.producto))}</td><td class="num">${eur(c.gasto)}</td><td class="num">${c.compras}</td>
+          <td class="num"><b style="color:var(--${st === "line" ? "strong" : st})">${c.cpa != null ? eur(c.cpa) : "—"}</b>${P.cpaMax ? `<div class="hint">máx ${eur(P.cpaMax)}</div>` : ""}</td><td class="num"><b>${c.roas != null ? String(c.roas.toFixed(2)).replace(".", ",") + "×" : "—"}</b>${P.roasBE ? `<div class="hint">BE ${String(P.roasBE).replace(".", ",")}×</div>` : ""}</td></tr>`; }).join("")}
+    </tbody></table></div>` : `<div class="hint">No hay conjuntos activos con datos.</div>`}</div>` : "";
   return `<h1>Hoy · ${esc(dia)}</h1><div class="sub">Resumen de lo que hay para hoy, de más a menos importante. Pulsa cualquier línea para ir a su página.</div>
+  ${tienda}
   <div class="hgrid">
     ${caja("bad", "🔴 Actuar ya", G("bad"), "Nada urgente 🎉")}
     ${caja("warn", "🟠 Atención", G("warn"), "Nada que vigilar")}
