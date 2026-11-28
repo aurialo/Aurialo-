@@ -168,3 +168,7 @@ details.psec:not([open])>summary::after{transform:rotate(-90deg)}
 @media(max-width:760px){.tienda .tminis{grid-template-columns:repeat(2,minmax(0,1fr))}.tmini .tv{font-size:17px}}
 .sm-only{display:none}
 @media(max-width:760px){.tconj .hm{display:none}.sm-only{display:block}.tconj{font-size:12px}.tconj td,.tconj th{padding:6px 5px}}
+.hbox.brand{background:#fff;border-color:var(--line)}
+.hbox ul.conj{list-style:none;padding-left:0}
+.hbox ul.conj li{padding:7px 0;border-top:1px solid var(--line);margin:0}
+.hbox .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
