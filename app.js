@@ -405,12 +405,14 @@ function panelHoy() {
   ].filter(Boolean) : [];
   const conjItems = mhHoy ? mhHoy.conjuntos.filter(c => c.gasto > 0).map(c => { const st = estC(c), P = C.productos.find(q => q.code === c.producto) || {};
     return `<span class="dot" style="background:var(--${st === "line" ? "muted" : st})"></span><b>${esc(c.nombre)}</b> <span class="hint">${esc(prodName(c.producto))}</span><br>${eur(c.gasto)} · ${c.compras} compra${c.compras === 1 ? "" : "s"} · CPA <b style="color:var(--${st === "line" ? "strong" : st})">${c.cpa != null ? eur(c.cpa) : "—"}</b>${P.cpaMax ? `<span class="hint"> / máx ${eur(P.cpaMax)}</span>` : ""} · ROAS <b>${c.roas != null ? num2(c.roas) + "×" : "—"}</b>`; }) : [];
-  const resumenDia = !EQ ? `<div class="hgrid">
-    <div class="hbox brand"><div class="hbox-t">🏪 Tienda hoy<span>${sh ? "Shopify " + new Date(sh.fecha).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : ""}</span></div>${tiendaItems.length ? `<ul>${tiendaItems.map(t => `<li>${t}</li>`).join("")}</ul>` : `<div class="hint">Aún no hay pedidos de hoy.</div>`}</div>
-    <div class="hbox brand"><div class="hbox-t">📈 Conjuntos hoy<span>${mhHoy ? "Meta " + new Date(mhHoy.fecha).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : ""}</span></div>
-      ${mhHoy ? `<div style="margin-bottom:6px;color:var(--strong)">Total: <b>${eur(mhHoy.total.gasto)}</b> · ${mhHoy.total.compras} compras · CPA <b>${mhHoy.total.cpa != null ? eur(mhHoy.total.cpa) : "—"}</b> · ROAS <b>${mhHoy.total.roas != null ? num2(mhHoy.total.roas) + "×" : "—"}</b> <span class="hint">(píxel)</span></div>
-      <ul class="conj">${conjItems.map(t => `<li>${t}</li>`).join("")}</ul><div class="hint" style="margin-top:4px">🟢 CPA en objetivo · 🟠 entre objetivo y máximo · 🔴 por encima del máximo</div>` : `<div class="hint">Todavía no hay datos de hoy (se actualizan cada hora).</div>`}</div>
-  </div>` : "";
+  const kp = (l, v, sub) => `<div class="tmini"><div class="hint">${l}</div><div class="tv">${v}</div><div class="hint">${sub || ""}</div></div>`;
+  const resumenDia = !EQ ? `<div class="card tienda" style="padding:14px 16px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><h3 style="margin:0">🏪 Tienda hoy</h3><span class="hint">${sh ? "Shopify " + new Date(sh.fecha).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : ""}</span></div>
+    <div class="tminis">
+      ${kp("Pedidos", sHoy ? sHoy.pedidos : 0, esperadoAhora ? (sHoy && sHoy.pedidos >= esperadoAhora ? `<span style="color:var(--ok)">▲ por encima de lo normal</span>` : `<span style="color:var(--bad)">▼ por debajo de lo normal</span>`) + ` (~${Math.round(esperadoAhora)} a esta hora)` : "")}
+      ${kp("Facturación", eur(sHoy ? sHoy.ventas : 0), "")}
+      ${kp("Ticket medio", sHoy && sHoy.pedidos ? eur(sHoy.ventas / sHoy.pedidos) : "—", "")}
+      ${kp("Por producto", sHoy && mix(sHoy) ? `<span style="font-size:15px">${mix(sHoy)}</span>` : "—", "")}
+    </div></div>` : "";
   return `<h1>Hoy · ${esc(dia)}</h1><div class="sub">Resumen de lo que hay para hoy, de más a menos importante. Pulsa cualquier línea para ir a su página.</div>
   ${resumenDia}
   <div class="hgrid">
